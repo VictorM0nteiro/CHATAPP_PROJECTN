@@ -95,6 +95,7 @@ import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import com.example.app_mensagem.R
 import com.example.app_mensagem.data.model.Message
+import com.example.app_mensagem.data.model.PresenceStatus
 import com.example.app_mensagem.data.model.User
 import com.example.app_mensagem.presentation.common.LifecycleObserver
 import com.example.app_mensagem.presentation.viewmodel.ChatViewModel
@@ -227,14 +228,32 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                 }
                             }
                         ) {
-                            AsyncImage(
-                                model = uiState.conversation?.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
-                                contentDescription = "Foto de Perfil de ${uiState.conversationTitle}",
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
+                            Box(modifier = Modifier.size(40.dp)) {
+                                AsyncImage(
+                                    model = uiState.conversation?.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
+                                    contentDescription = "Foto de Perfil de ${uiState.conversationTitle}",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                                if (uiState.conversation?.isGroup != true) {
+                                    val presence = PresenceStatus.fromKey(uiState.otherUserPresenceStatus)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when (presence) {
+                                                    PresenceStatus.ONLINE -> Color(0xFF4CAF50)
+                                                    PresenceStatus.BUSY -> Color(0xFFFFC107)
+                                                    PresenceStatus.OFFLINE -> Color.Gray
+                                                }
+                                            )
+                                            .align(Alignment.BottomEnd)
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
@@ -245,6 +264,13 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                 if (uiState.conversation?.isGroup == true) {
                                     Text(
                                         text = "Grupo",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                    )
+                                } else {
+                                    val presence = PresenceStatus.fromKey(uiState.otherUserPresenceStatus)
+                                    Text(
+                                        text = presence.label,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
                                     )
