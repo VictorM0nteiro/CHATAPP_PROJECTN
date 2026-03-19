@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
 import android.net.Uri as AndroidUri
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -92,6 +94,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -124,6 +127,9 @@ import com.example.app_mensagem.data.model.Message
 import com.example.app_mensagem.data.model.User
 import com.example.app_mensagem.presentation.common.LifecycleObserver
 import com.example.app_mensagem.presentation.viewmodel.ChatViewModel
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -144,6 +150,7 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
     var showMediaSheet by remember { mutableStateOf(false) }
     var showStickerPanel by remember { mutableStateOf(false) }
     var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
+    var fullscreenVideoUrl by remember { mutableStateOf<String?>(null) }
     var playingAudioId by remember { mutableStateOf<String?>(null) }
     var audioProgress by remember { mutableFloatStateOf(0f) }
     val mediaPlayer = remember { MediaPlayer() }
@@ -615,16 +622,7 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                         audioProgress = if (playingAudioId == message.id) audioProgress else 0f,
                                         onPlayAudio = { playAudio(message.id, message.content) },
                                         onPlayVideo = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                    setDataAndType(AndroidUri.parse(message.content), "video/*")
-                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                }
-                                                context.startActivity(intent)
-                                            } catch (_: Exception) {
-                                                val browserIntent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(message.content))
-                                                context.startActivity(browserIntent)
-                                            }
+                                            fullscreenVideoUrl = message.content
                                         },
                                         onOpenDocument = {
                                             try {
@@ -751,6 +749,13 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
         FullscreenImageViewer(
             imageUrl = url,
             onDismiss = { fullscreenImageUrl = null }
+        )
+    }
+
+    fullscreenVideoUrl?.let { url ->
+        FullscreenVideoPlayer(
+            videoUrl = url,
+            onDismiss = { fullscreenVideoUrl = null }
         )
     }
 }
@@ -1612,6 +1617,71 @@ private fun FullscreenImageViewer(
 
             IconButton(
                 onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Fechar",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+    }
+}
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun FullscreenVideoPlayer(
+    videoUrl: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(videoUrl))
+            prepare()
+            playWhenReady = true
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { exoPlayer.release() }
+    }
+
+    Dialog(
+        onDismissRequest = {
+            exoPlayer.release()
+            onDismiss()
+        },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = true
+                        layoutParams = FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            IconButton(
+                onClick = {
+                    exoPlayer.release()
+                    onDismiss()
+                },
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(16.dp)
