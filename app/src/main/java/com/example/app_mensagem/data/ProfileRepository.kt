@@ -26,7 +26,10 @@ class ProfileRepository {
             profilePictureUrl = data["profilePictureUrl"] as? String,
             status = data["status"] as? String ?: "",
             updateStatus = data["updateStatus"] as? String ?: "",
-            updateStatusTimestamp = (data["updateStatusTimestamp"] as? Long) ?: 0L
+            updateStatusTimestamp = (data["updateStatusTimestamp"] as? Long) ?: 0L,
+            lastSeenPrivacy = data["lastSeenPrivacy"] as? String ?: "everyone",
+            profilePhotoPrivacy = data["profilePhotoPrivacy"] as? String ?: "everyone",
+            statusPrivacy = data["statusPrivacy"] as? String ?: "everyone"
         )
     }
 
@@ -66,6 +69,16 @@ class ProfileRepository {
         val updatedUser = updatedUserSnapshot.getValue(User::class.java) ?: return
 
         propagateProfileUpdates(updatedUser)
+    }
+
+    suspend fun updatePrivacySettings(lastSeen: String, profilePhoto: String, status: String) {
+        val userId = auth.currentUser?.uid ?: return
+        val updates = mapOf(
+            "lastSeenPrivacy" to lastSeen,
+            "profilePhotoPrivacy" to profilePhoto,
+            "statusPrivacy" to status
+        )
+        database.getReference("users").child(userId).updateChildren(updates).await()
     }
 
     private suspend fun propagateProfileUpdates(updatedUser: User) {

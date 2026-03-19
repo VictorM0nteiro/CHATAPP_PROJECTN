@@ -66,14 +66,22 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import android.media.MediaPlayer
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -124,6 +132,80 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    // ── Player de áudio centralizado (um único MediaPlayer para toda a tela) ──
+    var currentAudioUrl by remember { mutableStateOf<String?>(null) }
+    var isAudioPlaying by remember { mutableStateOf(false) }
+    var isAudioLoading by remember { mutableStateOf(false) }
+    var audioDuration by remember { mutableIntStateOf(0) }
+    var audioProgress by remember { mutableFloatStateOf(0f) }
+
+    val audioPlayer = remember {
+        MediaPlayer().apply {
+            setOnCompletionListener {
+                isAudioPlaying = false
+                audioProgress = 0f
+                it.seekTo(0)
+            }
+            setOnErrorListener { mp, _, _ ->
+                isAudioPlaying = false
+                isAudioLoading = false
+                mp.reset()
+                true
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (audioPlayer.isPlaying) audioPlayer.stop()
+            audioPlayer.release()
+        }
+    }
+
+    LaunchedEffect(isAudioPlaying) {
+        while (isAudioPlaying) {
+            if (audioPlayer.isPlaying) {
+                val dur = audioDuration.takeIf { it > 0 } ?: 1
+                audioProgress = audioPlayer.currentPosition.toFloat() / dur
+            }
+            delay(200)
+        }
+    }
+
+    fun playAudio(url: String) {
+        if (url.isBlank()) return
+        if (currentAudioUrl == url) {
+            // Mesmo áudio: play/pause
+            if (isAudioPlaying) {
+                audioPlayer.pause()
+                isAudioPlaying = false
+            } else {
+                audioPlayer.start()
+                isAudioPlaying = true
+            }
+        } else {
+            // Novo áudio: reset e carrega
+            isAudioLoading = true
+            isAudioPlaying = false
+            audioProgress = 0f
+            currentAudioUrl = url
+            try {
+                audioPlayer.reset()
+                audioPlayer.setDataSource(url)
+                audioPlayer.setOnPreparedListener { mp ->
+                    isAudioLoading = false
+                    audioDuration = mp.duration
+                    mp.start()
+                    isAudioPlaying = true
+                }
+                audioPlayer.prepareAsync()
+            } catch (_: Exception) {
+                isAudioLoading = false
+                currentAudioUrl = null
+            }
+        }
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -542,7 +624,12 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                         onLongPress = { y ->
                                             selectedMessageId = message.id
                                             selectedMessageY = y
-                                        }
+                                        },
+                                        currentAudioUrl = currentAudioUrl,
+                                        isAudioPlaying = isAudioPlaying,
+                                        isAudioLoading = isAudioLoading,
+                                        audioProgress = audioProgress,
+                                        onPlayAudio = { url -> playAudio(url) }
                                     )
                                 }
                             }
@@ -814,7 +901,12 @@ private fun MessageBubble(
     isMine: Boolean,
     highlightQuery: String,
     groupMembers: Map<String, User>,
-    onLongPress: (Float) -> Unit
+    onLongPress: (Float) -> Unit,
+    currentAudioUrl: String? = null,
+    isAudioPlaying: Boolean = false,
+    isAudioLoading: Boolean = false,
+    audioProgress: Float = 0f,
+    onPlayAudio: (String) -> Unit = {}
 ) {
     val backgroundColor =
         if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
@@ -910,34 +1002,27 @@ private fun MessageBubble(
                         }
 
                         "AUDIO" -> {
-                            val audioContext = LocalContext.current
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable {
-                                    val intent = android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse(message.content)
-                                    ).apply { addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-                                    try {
-                                        audioContext.startActivity(intent)
-                                    } catch (_: Exception) {}
+                            val isThisLoading = isAudioLoading && currentAudioUrl == message.content
+                            val isThisPlaying = isAudioPlaying && currentAudioUrl == message.content
+                            val thisProgress = if (currentAudioUrl == message.content) audioProgress else 0f
+
+                            if (message.content.isBlank()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = contentColor
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Preparando...", color = contentColor, fontSize = 13.sp)
                                 }
-                            ) {
-                                Icon(
-                                    Icons.Default.PlayArrow,
-                                    contentDescription = "Reproduzir áudio",
-                                    tint = contentColor
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    Icons.Default.GraphicEq,
-                                    contentDescription = null,
-                                    tint = contentColor
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Mensagem de voz",
-                                    color = contentColor
+                            } else {
+                                AudioBubble(
+                                    isPlaying = isThisPlaying,
+                                    isLoading = isThisLoading,
+                                    progress = thisProgress,
+                                    contentColor = contentColor,
+                                    onClick = { onPlayAudio(message.content) }
                                 )
                             }
                         }
@@ -1230,4 +1315,52 @@ private fun MessageActionsBar(
             }
         }
     }
+}
+
+@Composable
+private fun AudioBubble(
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    progress: Float,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    Column(modifier = Modifier.width(200.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = contentColor
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pausar" else "Reproduzir",
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+            Slider(
+                value = progress,
+                onValueChange = {},
+                modifier = Modifier.weight(1f).height(24.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = contentColor,
+                    activeTrackColor = contentColor,
+                    inactiveTrackColor = contentColor.copy(alpha = 0.3f)
+                )
+            )
+        }
+    }
+}
+
+private fun formatAudioTime(ms: Int): String {
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(minutes, seconds)
 }

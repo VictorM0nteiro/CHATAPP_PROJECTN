@@ -77,6 +77,9 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.app_mensagem.R
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material3.Switch
 import com.example.app_mensagem.presentation.viewmodel.ProfileViewModel
 import com.example.app_mensagem.presentation.viewmodel.ThemeViewModel
 import com.example.app_mensagem.ui.theme.AppColorTheme
@@ -101,12 +104,20 @@ fun ProfileScreen(
     var updateStatus by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
 
+    // Privacy settings state
+    var lastSeenPrivacy by remember { mutableStateOf("everyone") }
+    var profilePhotoPrivacy by remember { mutableStateOf("everyone") }
+    var statusPrivacy by remember { mutableStateOf("everyone") }
+
     LaunchedEffect(uiState.user) {
         uiState.user?.let { u ->
             name = u.name
             phoneNumber = u.phoneNumber
             status = u.status
             updateStatus = u.updateStatus
+            lastSeenPrivacy = u.lastSeenPrivacy
+            profilePhotoPrivacy = u.profilePhotoPrivacy
+            statusPrivacy = u.statusPrivacy
         }
     }
     var showImageSourceDialog by remember { mutableStateOf(false) }
@@ -410,6 +421,84 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // ── Card de Privacidade ───────────────────────────────────
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .padding(horizontal = 20.dp, vertical = 20.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Lock, null, tint = primary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Privacidade", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.Gray)
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    PrivacyToggleRow(
+                        label = "Último acesso",
+                        isPublic = lastSeenPrivacy == "everyone",
+                        onToggle = { lastSeenPrivacy = if (it) "everyone" else "nobody" },
+                        primary = primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    PrivacyToggleRow(
+                        label = "Foto de perfil",
+                        isPublic = profilePhotoPrivacy == "everyone",
+                        onToggle = { profilePhotoPrivacy = if (it) "everyone" else "nobody" },
+                        primary = primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    PrivacyToggleRow(
+                        label = "Status / Recado",
+                        isPublic = statusPrivacy == "everyone",
+                        onToggle = { statusPrivacy = if (it) "everyone" else "nobody" },
+                        primary = primary
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = {
+                            profileViewModel.updatePrivacySettings(
+                                lastSeen = lastSeenPrivacy,
+                                profilePhoto = profilePhotoPrivacy,
+                                status = statusPrivacy
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = primary)
+                    ) {
+                        Text("Salvar Privacidade", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ── Link para Sessões ─────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .clickable { navController.navigate("sessions") }
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Devices, null, tint = primary, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Dispositivos conectados", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Gerencie suas sessões ativas", fontSize = 12.sp, color = Color.Gray)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // ── Botão salvar ──────────────────────────────────────────
                 Button(
                     onClick = {
@@ -447,5 +536,31 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun PrivacyToggleRow(
+    label: String,
+    isPublic: Boolean,
+    onToggle: (Boolean) -> Unit,
+    primary: androidx.compose.ui.graphics.Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(
+                text = if (isPublic) "Todos podem ver" else "Ninguém pode ver",
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
+        }
+        Switch(
+            checked = isPublic,
+            onCheckedChange = onToggle
+        )
     }
 }

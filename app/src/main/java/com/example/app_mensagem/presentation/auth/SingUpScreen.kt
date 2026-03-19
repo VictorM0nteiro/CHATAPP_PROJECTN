@@ -1,9 +1,13 @@
 package com.example.app_mensagem.presentation.auth
 
 import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,6 +43,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -48,6 +53,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +74,9 @@ import coil.compose.AsyncImage
 import com.example.app_mensagem.R
 import com.example.app_mensagem.presentation.viewmodel.AuthUiState
 import com.example.app_mensagem.presentation.viewmodel.AuthViewModel
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.launch
 
 @Composable
 fun SignUpScreen(navController: NavController, viewModel: AuthViewModel) {
@@ -84,6 +93,8 @@ fun SignUpScreen(navController: NavController, viewModel: AuthViewModel) {
     val authState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
+    val coroutineScope = rememberCoroutineScope()
+    var googleSignInError by remember { mutableStateOf<String?>(null) }
     val tinderGradient = Brush.verticalGradient(
         colors = listOf(Color(0xFFFF7854), Color(0xFFFD267A))
     )
@@ -343,6 +354,61 @@ fun SignUpScreen(navController: NavController, viewModel: AuthViewModel) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = (authState as AuthUiState.Error).message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFE0E0E0))
+                        Text("  ou continue com  ", color = Color.Gray, fontSize = 12.sp)
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFE0E0E0))
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                try {
+                                    val credentialManager = CredentialManager.create(context)
+                                    val webClientId = context.getString(R.string.default_web_client_id)
+                                    val googleSignInOption = GetSignInWithGoogleOption.Builder(webClientId).build()
+                                    val request = GetCredentialRequest.Builder()
+                                        .addCredentialOption(googleSignInOption)
+                                        .build()
+                                    val result = credentialManager.getCredential(context = context, request = request)
+                                    val credential = result.credential
+                                    if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                                        val googleCred = GoogleIdTokenCredential.createFrom(credential.data)
+                                        viewModel.loginWithGoogle(googleCred.idToken)
+                                    }
+                                } catch (e: NoCredentialException) {
+                                    Log.w("SignUpScreen", "Nenhuma conta Google encontrada.")
+                                    googleSignInError = "Nenhuma conta Google encontrada no dispositivo."
+                                } catch (e: Exception) {
+                                    Log.e("SignUpScreen", "Erro no Google Sign-In: ${e.message}")
+                                    googleSignInError = "Erro ao entrar com Google. Tente novamente."
+                                }
+                            }
+                        },
+                        enabled = authState != AuthUiState.Loading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1A1A2E))
+                    ) {
+                        Text("G  Cadastrar com Google", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    }
+
+                    if (googleSignInError != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = googleSignInError!!,
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center

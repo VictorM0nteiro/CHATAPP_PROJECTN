@@ -28,7 +28,9 @@ import com.example.app_mensagem.presentation.status.StatusScreen
 import com.example.app_mensagem.presentation.status.StatusViewerScreen
 import com.example.app_mensagem.presentation.auth.ForgotPasswordScreen
 import com.example.app_mensagem.presentation.auth.LoginScreen
+import com.example.app_mensagem.presentation.auth.PhoneLoginScreen
 import com.example.app_mensagem.presentation.auth.SignUpScreen
+import com.example.app_mensagem.presentation.profile.SessionsScreen
 import com.example.app_mensagem.presentation.chat.ChatScreen
 import com.example.app_mensagem.presentation.contacts.ContactsScreen
 import com.example.app_mensagem.presentation.group.CreateGroupScreen
@@ -129,6 +131,14 @@ class MainActivity : ComponentActivity() {
 
                         composable("forgot_password") {
                             ForgotPasswordScreen(navController, authViewModel)
+                        }
+
+                        composable("phone_login") {
+                            PhoneLoginScreen(navController, authViewModel)
+                        }
+
+                        composable("sessions") {
+                            SessionsScreen(navController)
                         }
 
                         composable("calls") {

@@ -9,9 +9,9 @@
               <option name="connection">
                 <ConnectionSetting>
                   <option name="appId" value="com.example.app_mensagem" />
-                  <option name="mobileSdkAppId" value="1:105118131812:android:344c92bb4ca001d8266171" />
-                  <option name="projectId" value="app-mensagem-keila" />
-                  <option name="projectNumber" value="105118131812" />
+                  <option name="mobileSdkAppId" value="1:692558546395:android:e8f1a879ecae45a5fa13fe" />
+                  <option name="projectId" value="chatapp-68d7a" />
+                  <option name="projectNumber" value="692558546395" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

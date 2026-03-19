@@ -11,7 +11,7 @@ import com.example.app_mensagem.data.model.User
 
 @Database(
     entities = [User::class, Conversation::class, Message::class],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
