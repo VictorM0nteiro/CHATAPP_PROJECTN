@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -93,11 +95,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -136,6 +143,7 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
     var isSearchActive by remember { mutableStateOf(false) }
     var showMediaSheet by remember { mutableStateOf(false) }
     var showStickerPanel by remember { mutableStateOf(false) }
+    var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
     var playingAudioId by remember { mutableStateOf<String?>(null) }
     var audioProgress by remember { mutableFloatStateOf(0f) }
     val mediaPlayer = remember { MediaPlayer() }
@@ -631,16 +639,7 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                             }
                                         },
                                         onImageClick = { url ->
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                    setDataAndType(AndroidUri.parse(url), "image/*")
-                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                }
-                                                context.startActivity(intent)
-                                            } catch (_: Exception) {
-                                                val browserIntent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(url))
-                                                context.startActivity(browserIntent)
-                                            }
+                                            fullscreenImageUrl = url
                                         },
                                         onLongPress = {
                                             selectedMessageId = message.id
@@ -746,6 +745,13 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                 }
             )
         }
+    }
+
+    fullscreenImageUrl?.let { url ->
+        FullscreenImageViewer(
+            imageUrl = url,
+            onDismiss = { fullscreenImageUrl = null }
+        )
     }
 }
 
@@ -1542,6 +1548,80 @@ private fun StickerPanel(
                 ) {
                     Text(text = sticker, fontSize = 32.sp)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullscreenImageViewer(
+    imageUrl: String,
+    onDismiss: () -> Unit
+) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(1f, 5f)
+                        if (scale > 1f) {
+                            offset = Offset(
+                                x = offset.x + pan.x,
+                                y = offset.y + pan.y
+                            )
+                        } else {
+                            offset = Offset.Zero
+                        }
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            if (scale > 1f) {
+                                scale = 1f
+                                offset = Offset.Zero
+                            } else {
+                                scale = 3f
+                            }
+                        },
+                        onTap = { onDismiss() }
+                    )
+                }
+        ) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "Imagem em tela cheia",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offset.x,
+                        translationY = offset.y
+                    ),
+                contentScale = ContentScale.Fit
+            )
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Fechar",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
     }
