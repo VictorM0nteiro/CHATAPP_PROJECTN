@@ -46,11 +46,11 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun updateProfile(name: String, status: String, updateStatus: String, imageUri: Uri?) {
+    fun updateProfile(name: String, phoneNumber: String, status: String, updateStatus: String, imageUri: Uri?) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, isSaved = false)
             try {
-                repository.updateProfile(name, status, updateStatus, imageUri)
+                repository.updateProfile(name, phoneNumber, status, updateStatus, imageUri)
                 val user = repository.getUserProfile()
                 _uiState.value = ProfileUiState(
                     isLoading = false,
