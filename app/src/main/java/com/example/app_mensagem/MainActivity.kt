@@ -48,6 +48,7 @@ import com.example.app_mensagem.ui.theme.App_mensagemTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.net.URLDecoder
 
 class MainActivity : ComponentActivity() {
 
@@ -189,8 +190,9 @@ class MainActivity : ComponentActivity() {
                                 navArgument("memberIdsJson") { type = NavType.StringType }
                             )
                         ) { backStackEntry ->
-                            val memberIdsJson =
-                                backStackEntry.arguments?.getString("memberIdsJson")
+                            val rawJson =
+                                backStackEntry.arguments?.getString("memberIdsJson") ?: ""
+                            val memberIdsJson = URLDecoder.decode(rawJson, "UTF-8")
                             val type = object : TypeToken<List<String>>() {}.type
                             val memberIds: List<String> =
                                 Gson().fromJson(memberIdsJson, type) ?: emptyList()
