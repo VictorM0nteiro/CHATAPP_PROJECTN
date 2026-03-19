@@ -41,6 +41,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -77,6 +80,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.app_mensagem.R
+import com.example.app_mensagem.data.model.PresenceStatus
 import com.example.app_mensagem.presentation.viewmodel.ProfileViewModel
 import com.example.app_mensagem.presentation.viewmodel.ThemeViewModel
 import com.example.app_mensagem.ui.theme.AppColorTheme
@@ -101,6 +105,8 @@ fun ProfileScreen(
     var updateStatus by remember(user?.uid) { mutableStateOf(user?.updateStatus ?: "") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
+    var showStatusMenu by remember { mutableStateOf(false) }
+    val currentPresence = PresenceStatus.fromKey(user?.presenceStatus)
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -198,12 +204,12 @@ fun ProfileScreen(
                         .offset(y = (-48).dp),
                     contentAlignment = Alignment.TopCenter
                 ) {
-                    Box(contentAlignment = Alignment.BottomEnd) {
+                    Box(modifier = Modifier.size(96.dp)) {
                         AsyncImage(
                             model = imageUri ?: user?.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
                             contentDescription = "Foto de Perfil",
                             modifier = Modifier
-                                .size(96.dp)
+                                .fillMaxSize()
                                 .clip(CircleShape)
                                 .border(4.dp, Color.White, CircleShape)
                                 .shadow(4.dp, CircleShape)
@@ -215,15 +221,85 @@ fun ProfileScreen(
                                 .size(28.dp)
                                 .clip(CircleShape)
                                 .background(primary)
-                                .border(2.dp, Color.White, CircleShape),
+                                .border(2.dp, Color.White, CircleShape)
+                                .align(Alignment.BottomEnd),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                         }
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when (currentPresence) {
+                                        PresenceStatus.ONLINE -> Color(0xFF4CAF50)
+                                        PresenceStatus.BUSY -> Color(0xFFFFC107)
+                                        PresenceStatus.OFFLINE -> Color.Gray
+                                    }
+                                )
+                                .border(2.dp, Color.White, CircleShape)
+                                .align(Alignment.TopEnd)
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(56.dp))
+
+                Box(
+                    modifier = Modifier.fillMaxWidth().offset(y = (-40).dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box {
+                        OutlinedButton(
+                            onClick = { showStatusMenu = true },
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when (currentPresence) {
+                                            PresenceStatus.ONLINE -> Color(0xFF4CAF50)
+                                            PresenceStatus.BUSY -> Color(0xFFFFC107)
+                                            PresenceStatus.OFFLINE -> Color.Gray
+                                        }
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(currentPresence.label)
+                        }
+                        DropdownMenu(
+                            expanded = showStatusMenu,
+                            onDismissRequest = { showStatusMenu = false }
+                        ) {
+                            PresenceStatus.entries.forEach { ps ->
+                                DropdownMenuItem(
+                                    text = { Text(ps.label) },
+                                    onClick = {
+                                        profileViewModel.updatePresenceStatus(ps.key)
+                                        showStatusMenu = false
+                                    },
+                                    leadingIcon = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    when (ps) {
+                                                        PresenceStatus.ONLINE -> Color(0xFF4CAF50)
+                                                        PresenceStatus.BUSY -> Color(0xFFFFC107)
+                                                        PresenceStatus.OFFLINE -> Color.Gray
+                                                    }
+                                                )
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 // ── Card de dados ─────────────────────────────────────────
                 Column(
