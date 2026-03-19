@@ -3,8 +3,6 @@ package com.example.app_mensagem.presentation.chat
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.media.MediaPlayer
-import android.net.Uri as AndroidUri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -20,20 +18,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -41,9 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Done
@@ -52,8 +43,6 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
@@ -64,28 +53,23 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -93,11 +77,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -106,6 +94,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -118,12 +109,12 @@ import com.example.app_mensagem.data.model.User
 import com.example.app_mensagem.presentation.common.LifecycleObserver
 import com.example.app_mensagem.presentation.viewmodel.ChatViewModel
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.regex.Pattern
+
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -133,61 +124,13 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
     var text by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     var selectedMessageId by remember { mutableStateOf<String?>(null) }
+    var selectedMessageY by remember { mutableStateOf(0f) }
+    val containerTopHolder = remember { object { var y = 0f } }
     var isSearchActive by remember { mutableStateOf(false) }
-    var showMediaSheet by remember { mutableStateOf(false) }
-    var showStickerPanel by remember { mutableStateOf(false) }
-    var playingAudioId by remember { mutableStateOf<String?>(null) }
-    var audioProgress by remember { mutableFloatStateOf(0f) }
-    val mediaPlayer = remember { MediaPlayer() }
+    var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
+    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val primaryColor = MaterialTheme.colorScheme.primary
-
-    DisposableEffect(Unit) {
-        onDispose {
-            mediaPlayer.release()
-        }
-    }
-
-    fun playAudio(messageId: String, url: String) {
-        if (playingAudioId == messageId) {
-            mediaPlayer.stop()
-            mediaPlayer.reset()
-            playingAudioId = null
-            audioProgress = 0f
-            return
-        }
-
-        mediaPlayer.reset()
-        playingAudioId = messageId
-        audioProgress = 0f
-
-        try {
-            mediaPlayer.setDataSource(url)
-            mediaPlayer.prepareAsync()
-            mediaPlayer.setOnPreparedListener { mp ->
-                mp.start()
-                scope.launch {
-                    while (playingAudioId == messageId && mp.isPlaying) {
-                        audioProgress = mp.currentPosition.toFloat() / mp.duration.coerceAtLeast(1).toFloat()
-                        delay(200)
-                    }
-                }
-            }
-            mediaPlayer.setOnCompletionListener {
-                playingAudioId = null
-                audioProgress = 0f
-            }
-            mediaPlayer.setOnErrorListener { _, _, _ ->
-                playingAudioId = null
-                audioProgress = 0f
-                true
-            }
-        } catch (e: Exception) {
-            playingAudioId = null
-            audioProgress = 0f
-        }
-    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -266,22 +209,30 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
         }
     }
 
-    val isGroup = uiState.conversation?.isGroup ?: false
-
     Scaffold(
-        containerColor = Color.White,
         topBar = {
-            Column {
-                TopAppBar(
-                    navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Voltar"
-                            )
-                        }
-                    },
-                    title = {
+            val isGroup = uiState.conversation?.isGroup ?: false
+            TopAppBar(
+                title = {
+                    if (isSearchActive) {
+                        TextField(
+                            value = uiState.searchQuery,
+                            onValueChange = { chatViewModel.onSearchQueryChanged(it) },
+                            placeholder = { Text("Buscar na conversa...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = MaterialTheme.colorScheme.onPrimary,
+                                focusedTextColor = MaterialTheme.colorScheme.onPrimary,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            textStyle = LocalTextStyle.current.copy(color = MaterialTheme.colorScheme.onPrimary)
+                        )
+                    } else {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.clickable(enabled = isGroup) {
@@ -290,139 +241,99 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                 }
                             }
                         ) {
-                            Box(
+                            AsyncImage(
+                                model = uiState.conversation?.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
+                                contentDescription = "Foto de Perfil de ${uiState.conversationTitle}",
                                 modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(primaryColor),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                val photoUrl = uiState.conversation?.profilePictureUrl
-                                if (!photoUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = photoUrl,
-                                        contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
-                                    Text(
-                                        text = uiState.conversationTitle
-                                            .split(" ")
-                                            .filter { it.isNotBlank() }
-                                            .take(2)
-                                            .joinToString("") { it.first().uppercase() }
-                                            .ifEmpty { "?" },
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
+                                    .size(40.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = uiState.conversationTitle.ifBlank { "..." },
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 16.sp,
+                                    text = uiState.conversationTitle,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                if (isGroup) {
+                                if (uiState.conversation?.isGroup == true) {
                                     Text(
                                         text = "Grupo",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF9E9E9E)
+                                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
                                     )
                                 }
                             }
                         }
-                    },
-                    actions = {
-                        IconButton(onClick = { isSearchActive = !isSearchActive }) {
-                            Icon(Icons.Default.Search, contentDescription = "Buscar")
-                        }
-                        if (isGroup) {
-                            IconButton(onClick = {
-                                if (conversationId != null) {
-                                    navController.navigate("group_info/$conversationId")
-                                }
-                            }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Detalhes")
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
-                )
-
-                AnimatedVisibility(visible = isSearchActive) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.White)
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = uiState.searchQuery,
-                            onValueChange = { chatViewModel.onSearchQueryChanged(it) },
-                            placeholder = { Text("Buscar na conversa...", color = Color(0xFF9E9E9E)) },
-                            leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF9E9E9E)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(24.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = primaryColor,
-                                unfocusedBorderColor = Color(0xFFE0E0E0),
-                                unfocusedContainerColor = Color(0xFFF5F5F5),
-                                focusedContainerColor = Color(0xFFF5F5F5)
-                            )
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                },
+                navigationIcon = {
+                    if (isSearchActive) {
                         IconButton(onClick = {
                             isSearchActive = false
                             chatViewModel.onSearchQueryChanged("")
                         }) {
-                            Icon(Icons.Default.Close, "Fechar busca", tint = Color(0xFF757575))
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Fechar Busca",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Voltar",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
                         }
                     }
-                }
+                },
+                actions = {
+                    if (!isSearchActive) {
+                        IconButton(onClick = { isSearchActive = true }) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Buscar Mensagem",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                if (conversationId != null) {
+                                    val hasPermission = ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.ACCESS_FINE_LOCATION
+                                    ) == PackageManager.PERMISSION_GRANTED
 
-                uiState.pinnedMessage?.let { pinned ->
-                    PinnedMessageBar(
-                        message = pinned,
-                        currentUserId = FirebaseAuth.getInstance().currentUser?.uid,
-                        onClick = {
-                            val index = uiState.chatItems.indexOfFirst {
-                                it is ChatItem.MessageItem && it.message.id == pinned.id
-                            }
-                            if (index >= 0) {
-                                scope.launch {
-                                    try {
-                                        listState.animateScrollToItem(index)
-                                    } catch (_: Exception) {}
+                                    if (hasPermission) {
+                                        chatViewModel.sendLocation(conversationId)
+                                    } else {
+                                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                    }
                                 }
                             }
-                        },
-                        onUnpinClick = {
-                            if (conversationId != null) {
-                                chatViewModel.onPinMessageClick(conversationId, pinned)
-                            }
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = "Enviar Localização",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
                         }
-                    )
-                }
-
-                HorizontalDivider(color = Color(0xFFF0F0F0))
-            }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
         },
         bottomBar = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
-                HorizontalDivider(color = Color(0xFFF0F0F0))
-
                 AnimatedVisibility(visible = uiState.mediaToSendUri != null) {
                     AttachmentPreview(
                         mediaType = uiState.mediaType,
@@ -432,100 +343,109 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                     )
                 }
 
-                if (uiState.isRecording) {
-                    RecordingBar(
-                        onStop = {
-                            if (conversationId != null) {
-                                chatViewModel.stopRecording(conversationId)
-                            }
-                        },
-                        onCancel = { chatViewModel.cancelRecording() }
-                    )
-                } else {
-                    AnimatedVisibility(visible = showStickerPanel) {
-                        StickerPanel(
-                            onStickerSelected = { emoji ->
-                                if (conversationId != null) {
-                                    chatViewModel.sendSticker(conversationId, emoji)
-                                }
-                                showStickerPanel = false
-                            }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { videoPickerLauncher.launch("video/*") }) {
+                        Icon(
+                            Icons.Default.VideoLibrary,
+                            contentDescription = "Enviar vídeo",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 6.dp)
-                            .navigationBarsPadding()
-                            .imePadding(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { showMediaSheet = true }) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Anexar",
-                                tint = primaryColor
-                            )
-                        }
 
-                        IconButton(onClick = { showStickerPanel = !showStickerPanel }) {
-                            Icon(
-                                Icons.Default.EmojiEmotions,
-                                contentDescription = "Stickers",
-                                tint = if (showStickerPanel) primaryColor else Color.Gray
-                            )
-                        }
-
-                        OutlinedTextField(
-                            value = text,
-                            onValueChange = { text = it },
-                            placeholder = { Text("Mensagem...", color = Color(0xFF9E9E9E), fontSize = 14.sp) },
-                            singleLine = false,
-                            maxLines = 4,
-                            modifier = Modifier.weight(1f),
-                            enabled = uiState.mediaToSendUri == null,
-                            shape = RoundedCornerShape(24.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = primaryColor,
-                                unfocusedBorderColor = Color(0xFFE0E0E0),
-                                unfocusedContainerColor = Color(0xFFF5F5F5),
-                                focusedContainerColor = Color(0xFFF5F5F5)
-                            )
+                    IconButton(onClick = { documentPickerLauncher.launch(arrayOf("*/*")) }) {
+                        Icon(
+                            Icons.Default.Description,
+                            contentDescription = "Enviar documento",
+                            tint = MaterialTheme.colorScheme.primary
                         )
+                    }
 
-                        Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = {
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.CAMERA
+                            ) == PackageManager.PERMISSION_GRANTED
 
-                        FloatingActionButton(
-                            onClick = {
-                                if (text.isNotBlank() || uiState.mediaToSendUri != null) {
-                                    if (conversationId != null) {
-                                        chatViewModel.sendMessage(conversationId, text.trim())
-                                        text = ""
-                                    }
-                                } else {
-                                    val hasPermission = ContextCompat.checkSelfPermission(
-                                        context, Manifest.permission.RECORD_AUDIO
-                                    ) == PackageManager.PERMISSION_GRANTED
-                                    if (hasPermission) {
-                                        chatViewModel.startRecording()
-                                    } else {
-                                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                    }
-                                }
-                            },
-                            modifier = Modifier.size(46.dp),
-                            containerColor = primaryColor,
-                            contentColor = Color.White,
-                            elevation = FloatingActionButtonDefaults.elevation(0.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (text.isNotBlank() || uiState.mediaToSendUri != null)
-                                    Icons.AutoMirrored.Filled.Send
-                                else Icons.Default.Mic,
-                                contentDescription = if (text.isNotBlank() || uiState.mediaToSendUri != null) "Enviar" else "Gravar áudio",
-                                modifier = Modifier.size(22.dp)
-                            )
+                            if (hasPermission) {
+                                cameraLauncher.launch(null)
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
                         }
+                    ) {
+                        Icon(
+                            Icons.Default.PhotoCamera,
+                            contentDescription = "Tirar foto",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            if (uiState.isRecording) {
+                                if (conversationId != null) {
+                                    chatViewModel.stopRecording(conversationId)
+                                }
+                            } else {
+                                val hasPermission = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED
+
+                                if (hasPermission) {
+                                    chatViewModel.startRecording()
+                                } else {
+                                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.isRecording) Icons.Default.StopCircle else Icons.Default.Mic,
+                            contentDescription = if (uiState.isRecording) "Parar gravação" else "Gravar áudio",
+                            tint = if (uiState.isRecording) Color.Red else MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = {
+                            Text(
+                                if (uiState.isRecording) "Gravando..." else "Digite uma mensagem...",
+                                maxLines = 1
+                            )
+                        },
+                        singleLine = true,
+                        enabled = uiState.mediaToSendUri == null && !uiState.isRecording,
+                        shape = RoundedCornerShape(24.dp)
+                    )
+
+                    IconButton(
+                        onClick = {
+                            if (conversationId != null) {
+                                chatViewModel.sendMessage(conversationId, text.trim())
+                                text = ""
+                            }
+                        },
+                        enabled = (text.isNotBlank() || uiState.mediaToSendUri != null) && conversationId != null && !uiState.isRecording
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Enviar",
+                            tint = if ((text.isNotBlank() || uiState.mediaToSendUri != null) && conversationId != null && !uiState.isRecording) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            }
+                        )
                     }
                 }
 
@@ -543,10 +463,33 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFFAFAFA))
+                .background(MaterialTheme.colorScheme.background)
                 .padding(paddingValues)
+                .onGloballyPositioned { containerTopHolder.y = it.positionInRoot().y }
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                uiState.pinnedMessage?.let { pinned ->
+                    PinnedMessageBar(
+                        message = pinned,
+                        currentUserId = FirebaseAuth.getInstance().currentUser?.uid,
+                        onClick = {
+                            val index = uiState.chatItems.indexOfFirst {
+                                it is ChatItem.MessageItem && it.message.id == pinned.id
+                            }
+                            if (index >= 0) {
+                                scope.launch { listState.animateScrollToItem(index) }
+                            }
+                        },
+                        onUnpinClick = {
+                            if (conversationId != null) {
+                                chatViewModel.onPinMessageClick(conversationId, pinned)
+                            }
+                        }
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(4.dp))
 
                 if (uiState.isLoading && uiState.chatItems.isEmpty()) {
@@ -554,7 +497,7 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = primaryColor)
+                        CircularProgressIndicator()
                     }
                 } else if (uiState.chatItems.isEmpty()) {
                     Box(
@@ -568,7 +511,7 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                 "Envie a primeira mensagem."
                             },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF9E9E9E),
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                             textAlign = TextAlign.Center
                         )
                     }
@@ -603,48 +546,11 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                         isMine = isMine,
                                         highlightQuery = uiState.searchQuery,
                                         groupMembers = uiState.groupMembers,
-                                        isAudioPlaying = playingAudioId == message.id,
-                                        audioProgress = if (playingAudioId == message.id) audioProgress else 0f,
-                                        onPlayAudio = { playAudio(message.id, message.content) },
-                                        onPlayVideo = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                    setDataAndType(AndroidUri.parse(message.content), "video/*")
-                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                }
-                                                context.startActivity(intent)
-                                            } catch (_: Exception) {
-                                                val browserIntent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(message.content))
-                                                context.startActivity(browserIntent)
-                                            }
-                                        },
-                                        onOpenDocument = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                    data = AndroidUri.parse(message.content)
-                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                }
-                                                context.startActivity(intent)
-                                            } catch (_: Exception) {
-                                                val browserIntent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(message.content))
-                                                context.startActivity(browserIntent)
-                                            }
-                                        },
-                                        onImageClick = { url ->
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                    setDataAndType(AndroidUri.parse(url), "image/*")
-                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                }
-                                                context.startActivity(intent)
-                                            } catch (_: Exception) {
-                                                val browserIntent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(url))
-                                                context.startActivity(browserIntent)
-                                            }
-                                        },
-                                        onLongPress = {
+                                        onLongPress = { y ->
                                             selectedMessageId = message.id
-                                        }
+                                            selectedMessageY = y
+                                        },
+                                        onImageClick = { url -> fullscreenImageUrl = url }
                                     )
                                 }
                             }
@@ -652,25 +558,41 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                     }
 
                     LaunchedEffect(uiState.chatItems.size) {
-                        val lastIndex = uiState.chatItems.lastIndex
-                        if (lastIndex >= 0) {
-                            scope.launch {
-                                try {
-                                    listState.animateScrollToItem(lastIndex)
-                                } catch (_: Exception) {}
-                            }
+                        val index = uiState.chatItems.lastIndex
+                        if (index >= 0) {
+                            listState.animateScrollToItem(index)
                         }
                     }
                 }
             }
 
+            fullscreenImageUrl?.let { imageUrl ->
+                FullscreenImageViewer(
+                    imageUrl = imageUrl,
+                    onDismiss = { fullscreenImageUrl = null }
+                )
+            }
+
             if (selectedMessageId != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.25f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { selectedMessageId = null }
+                        )
+                )
                 val selectedMessage = uiState.messages.find { it.id == selectedMessageId }
                 selectedMessage?.let { msg ->
+                    val relativeYDp = with(density) { (selectedMessageY - containerTopHolder.y).toDp() }
+                    val clampedY = maxOf(8.dp, relativeYDp)
                     MessageActionsBar(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 88.dp),
+                            .align(Alignment.TopStart)
+                            .padding(horizontal = 16.dp)
+                            .offset(y = clampedY),
                         isPinned = uiState.pinnedMessage?.id == msg.id,
                         onDismiss = { selectedMessageId = null },
                         onPinClick = {
@@ -688,169 +610,6 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                     )
                 }
             }
-        }
-    }
-
-    if (showMediaSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showMediaSheet = false },
-            containerColor = Color.White
-        ) {
-            MediaPickerContent(
-                onGallery = {
-                    imagePickerLauncher.launch("image/*")
-                    showMediaSheet = false
-                },
-                onCamera = {
-                    showMediaSheet = false
-                    val hasPermission = ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.CAMERA
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (hasPermission) {
-                        cameraLauncher.launch(null)
-                    } else {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                },
-                onVideo = {
-                    videoPickerLauncher.launch("video/*")
-                    showMediaSheet = false
-                },
-                onDocument = {
-                    documentPickerLauncher.launch(arrayOf("*/*"))
-                    showMediaSheet = false
-                },
-                onAudio = {
-                    showMediaSheet = false
-                    val hasPermission = ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (hasPermission) {
-                        chatViewModel.startRecording()
-                    } else {
-                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                },
-                onLocation = {
-                    showMediaSheet = false
-                    if (conversationId != null) {
-                        val hasPermission = ContextCompat.checkSelfPermission(
-                            context, Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (hasPermission) {
-                            chatViewModel.sendLocation(conversationId)
-                        } else {
-                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                        }
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun MediaPickerContent(
-    onGallery: () -> Unit,
-    onCamera: () -> Unit,
-    onVideo: () -> Unit,
-    onDocument: () -> Unit,
-    onAudio: () -> Unit,
-    onLocation: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
-            .navigationBarsPadding()
-    ) {
-        Text(
-            "Enviar",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            color = Color(0xFF212121)
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            MediaOption(Icons.Default.AttachFile, "Galeria", Color(0xFF4CAF50), onGallery)
-            MediaOption(Icons.Default.PhotoCamera, "Câmera", Color(0xFF2196F3), onCamera)
-            MediaOption(Icons.Default.VideoLibrary, "Vídeo", Color(0xFF9C27B0), onVideo)
-        }
-        Spacer(modifier = Modifier.height(20.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            MediaOption(Icons.Default.Description, "Documento", Color(0xFFFF9800), onDocument)
-            MediaOption(Icons.Default.Mic, "Áudio", Color(0xFFF44336), onAudio)
-            MediaOption(Icons.Default.LocationOn, "Local", Color(0xFF00BCD4), onLocation)
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-    }
-}
-
-@Composable
-private fun MediaOption(
-    icon: ImageVector,
-    label: String,
-    tint: Color,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(tint.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(26.dp))
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(label, fontSize = 12.sp, color = Color.DarkGray)
-    }
-}
-
-@Composable
-private fun RecordingBar(
-    onStop: () -> Unit,
-    onCancel: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .navigationBarsPadding()
-            .imePadding(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(Color.Red)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            "Gravando...",
-            color = Color.Red,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
-        IconButton(onClick = onCancel) {
-            Icon(Icons.Default.Close, "Cancelar gravação", tint = Color.Gray)
-        }
-        IconButton(onClick = onStop) {
-            Icon(Icons.Default.StopCircle, "Parar e enviar", tint = Color.Red)
         }
     }
 }
@@ -988,14 +747,14 @@ private fun DateChip(dateText: String) {
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            color = Color(0xFFE0E0E0),
-            shape = RoundedCornerShape(12.dp)
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.07f),
+            shape = RoundedCornerShape(16.dp)
         ) {
             Text(
                 text = dateText,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                fontSize = 11.sp,
-                color = Color(0xFF757575)
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
             )
         }
     }
@@ -1053,11 +812,11 @@ private fun PinnedMessageBar(
 
 private fun pinnedPreviewText(message: Message, currentUserId: String?): String {
     return when (message.type) {
-        "IMAGE" -> "\uD83D\uDCF7 Imagem"
-        "VIDEO" -> "\uD83C\uDFA5 Vídeo"
-        "AUDIO" -> "\uD83C\uDFA4 Mensagem de voz"
-        "DOCUMENT" -> "\uD83D\uDCC4 ${message.fileName ?: "Documento"}"
-        "LOCATION" -> "\uD83D\uDCCD Localização"
+        "IMAGE" -> "📷 Imagem"
+        "VIDEO" -> "🎥 Vídeo"
+        "AUDIO" -> "🎤 Mensagem de voz"
+        "DOCUMENT" -> "📄 ${message.fileName ?: "Documento"}"
+        "LOCATION" -> "📍 Localização"
         "STICKER" -> "Figurinha"
         else -> message.content.take(80) + if (message.content.length > 80) "…" else ""
     }
@@ -1070,18 +829,15 @@ private fun MessageBubble(
     isMine: Boolean,
     highlightQuery: String,
     groupMembers: Map<String, User>,
-    isAudioPlaying: Boolean = false,
-    audioProgress: Float = 0f,
-    onPlayAudio: () -> Unit = {},
-    onPlayVideo: () -> Unit = {},
-    onOpenDocument: () -> Unit = {},
-    onImageClick: (String) -> Unit = {},
-    onLongPress: () -> Unit
+    onLongPress: (Float) -> Unit,
+    onImageClick: (String) -> Unit = {}
 ) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val backgroundColor = if (isMine) primaryColor else Color.White
-    val contentColor = if (isMine) Color.White else Color(0xFF212121)
-    val context = LocalContext.current
+    val backgroundColor =
+        if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+    val contentColor =
+        if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+
+    val bubbleTopHolder = remember { object { var y = 0f } }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1093,12 +849,14 @@ private fun MessageBubble(
 
         Column(
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
-            modifier = Modifier.combinedClickable(
-                onClick = {},
-                onLongClick = onLongPress,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            )
+            modifier = Modifier
+                .onGloballyPositioned { bubbleTopHolder.y = it.positionInRoot().y }
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = { onLongPress(bubbleTopHolder.y) },
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                )
         ) {
             if (!isMine && groupMembers.isNotEmpty()) {
                 val senderName = groupMembers[message.senderId]?.name
@@ -1106,7 +864,7 @@ private fun MessageBubble(
                     Text(
                         text = senderName,
                         style = MaterialTheme.typography.labelSmall,
-                        color = primaryColor,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
                     )
                 }
@@ -1120,7 +878,7 @@ private fun MessageBubble(
                     bottomEnd = if (isMine) 4.dp else 18.dp
                 ),
                 color = backgroundColor,
-                tonalElevation = if (isMine) 0.dp else 1.dp
+                tonalElevation = 1.dp
             ) {
                 Column(
                     modifier = Modifier
@@ -1141,89 +899,81 @@ private fun MessageBubble(
                         }
 
                         "VIDEO" -> {
-                            Column(
-                                modifier = Modifier.clickable { onPlayVideo() }
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    message.thumbnailUrl?.let { thumb ->
-                                        AsyncImage(
-                                            model = thumb,
-                                            contentDescription = "Miniatura do vídeo",
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(12.dp)),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } ?: Box(
+                            Column {
+                                message.thumbnailUrl?.let { thumb ->
+                                    AsyncImage(
+                                        model = thumb,
+                                        contentDescription = "Miniatura do vídeo",
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(120.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(contentColor.copy(alpha = 0.1f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {}
-                                    Box(
-                                        modifier = Modifier
-                                            .size(48.dp)
-                                            .clip(CircleShape)
-                                            .background(Color.Black.copy(alpha = 0.5f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Default.PlayArrow,
-                                            contentDescription = "Reproduzir vídeo",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(30.dp)
-                                        )
-                                    }
+                                            .clip(RoundedCornerShape(12.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = message.fileName ?: "Vídeo",
-                                    fontSize = 12.sp,
-                                    color = contentColor.copy(alpha = 0.8f)
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = contentColor
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = message.fileName ?: "Vídeo",
+                                        color = contentColor
+                                    )
+                                }
                             }
                         }
 
                         "AUDIO" -> {
+                            val audioContext = LocalContext.current
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clickable { onPlayAudio() }
-                                    .padding(vertical = 2.dp)
+                                modifier = Modifier.clickable {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(message.content)
+                                    ).apply { addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                                    try {
+                                        audioContext.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
                             ) {
                                 Icon(
-                                    imageVector = if (isAudioPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isAudioPlaying) "Pausar" else "Reproduzir",
-                                    tint = contentColor,
-                                    modifier = Modifier.size(28.dp)
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = "Reproduzir áudio",
+                                    tint = contentColor
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    LinearProgressIndicator(
-                                        progress = { audioProgress },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(3.dp)
-                                            .clip(RoundedCornerShape(2.dp)),
-                                        color = contentColor,
-                                        trackColor = contentColor.copy(alpha = 0.3f)
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Mensagem de voz",
-                                        fontSize = 12.sp,
-                                        color = contentColor.copy(alpha = 0.8f)
-                                    )
-                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Default.GraphicEq,
+                                    contentDescription = null,
+                                    tint = contentColor
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Mensagem de voz",
+                                    color = contentColor
+                                )
                             }
                         }
 
                         "DOCUMENT" -> {
+                            val docContext = LocalContext.current
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { onOpenDocument() }
+                                modifier = Modifier.clickable {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(message.content)
+                                    )
+                                    try {
+                                        docContext.startActivity(
+                                            android.content.Intent.createChooser(intent, "Abrir com...")
+                                        )
+                                    } catch (_: Exception) {}
+                                }
                             ) {
                                 Icon(
                                     Icons.Default.Description,
@@ -1233,73 +983,73 @@ private fun MessageBubble(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = message.fileName ?: "Documento",
-                                    color = contentColor
+                                    color = contentColor,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                                    )
                                 )
                             }
                         }
 
                         "LOCATION" -> {
-                            val coords = extractCoordsFromUrl(message.content)
-                            Column(
-                                modifier = Modifier.clickable {
-                                    try {
-                                        val intent = Intent(
-                                            Intent.ACTION_VIEW,
-                                            AndroidUri.parse(message.content)
-                                        )
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) {}
-                                }
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(130.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(
-                                            Brush.verticalGradient(
-                                                colors = listOf(
-                                                    Color(0xFFE8F5E9),
-                                                    Color(0xFFC8E6C9),
-                                                    Color(0xFFA5D6A7)
-                                                )
-                                            )
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(
-                                            Icons.Default.LocationOn,
-                                            contentDescription = null,
-                                            tint = Color(0xFFD32F2F),
-                                            modifier = Modifier.size(40.dp)
-                                        )
-                                        if (coords != null) {
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                text = "${coords.first}, ${coords.second}",
-                                                fontSize = 10.sp,
-                                                color = Color(0xFF555555),
-                                                maxLines = 1
-                                            )
+                            val locationContext = LocalContext.current
+                            val coords = message.content.substringAfter("query=", "")
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isMine)
+                                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f)
+                                else
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                modifier = Modifier
+                                    .clickable {
+                                        val mapsUrl = if (message.content.startsWith("http")) {
+                                            message.content
+                                        } else if (coords.isNotEmpty()) {
+                                            "https://www.google.com/maps/search/?api=1&query=$coords"
+                                        } else {
+                                            message.content
                                         }
+                                        val browserIntent = android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(mapsUrl)
+                                        )
+                                        try {
+                                            locationContext.startActivity(browserIntent)
+                                        } catch (_: Exception) {}
                                     }
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
                                     Icon(
                                         Icons.Default.LocationOn,
                                         contentDescription = null,
-                                        tint = contentColor,
-                                        modifier = Modifier.size(16.dp)
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(28.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Abrir no Google Maps",
-                                        fontSize = 12.sp,
-                                        color = contentColor.copy(alpha = 0.8f),
-                                        fontWeight = FontWeight.Medium
-                                    )
+                                    Column {
+                                        Text(
+                                            text = "Localização",
+                                            color = contentColor,
+                                            fontWeight = FontWeight.SemiBold,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        if (coords.isNotEmpty()) {
+                                            Text(
+                                                text = coords,
+                                                color = contentColor.copy(alpha = 0.75f),
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                        Text(
+                                            text = "Toque para abrir no Maps",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1307,9 +1057,7 @@ private fun MessageBubble(
                         "STICKER" -> {
                             Text(
                                 text = message.content,
-                                fontSize = 72.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
+                                fontSize = 28.sp
                             )
                         }
 
@@ -1332,7 +1080,7 @@ private fun MessageBubble(
                         Text(
                             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp)),
                             style = MaterialTheme.typography.labelSmall,
-                            color = contentColor.copy(alpha = 0.7f)
+                            color = contentColor.copy(alpha = 0.8f)
                         )
 
                         if (isMine) {
@@ -1347,7 +1095,7 @@ private fun MessageBubble(
                             val statusTint = when {
                                 message.readTimestamp > 0L -> Color(0xFF4FC3F7)
                                 message.status == "FAILED" -> Color.Red
-                                else -> contentColor.copy(alpha = 0.7f)
+                                else -> contentColor.copy(alpha = 0.8f)
                             }
                             Icon(
                                 imageVector = statusIcon,
@@ -1440,6 +1188,70 @@ private fun HighlightingText(
 }
 
 @Composable
+private fun FullscreenImageViewer(
+    imageUrl: String,
+    onDismiss: () -> Unit
+) {
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(0.5f, 5f)
+                        offset = if (scale > 1f) {
+                            Offset(offset.x + pan.x, offset.y + pan.y)
+                        } else {
+                            Offset.Zero
+                        }
+                    }
+                }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "Imagem em tela cheia",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offset.x,
+                        translationY = offset.y
+                    ),
+                contentScale = ContentScale.Fit
+            )
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Fechar",
+                    tint = Color.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun MessageActionsBar(
     modifier: Modifier = Modifier,
     isPinned: Boolean,
@@ -1450,7 +1262,6 @@ private fun MessageActionsBar(
     Surface(
         tonalElevation = 4.dp,
         shape = RoundedCornerShape(24.dp),
-        color = Color.White,
         modifier = modifier
     ) {
         Column(
@@ -1461,7 +1272,7 @@ private fun MessageActionsBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                val reactions = listOf("\uD83D\uDC4D", "❤\uFE0F", "\uD83D\uDE02", "\uD83D\uDE2E", "\uD83D\uDE22", "\uD83D\uDC4F")
+                val reactions = listOf("👍", "❤️", "😂", "😮", "😢", "👏")
                 reactions.forEach { emoji ->
                     Text(
                         text = emoji,
@@ -1500,55 +1311,4 @@ private fun MessageActionsBar(
             }
         }
     }
-}
-
-private val stickerList = listOf(
-    "\uD83D\uDE00", "\uD83D\uDE02", "\uD83D\uDE0D", "\uD83E\uDD29", "\uD83E\uDD23",
-    "\uD83D\uDE0E", "\uD83D\uDE1C", "\uD83E\uDD17", "\uD83D\uDE4F", "\uD83D\uDC4D",
-    "\uD83D\uDC4B", "\uD83C\uDF89", "\uD83D\uDD25", "\u2764\uFE0F", "\uD83D\uDC94",
-    "\uD83D\uDCAF", "\uD83C\uDF1F", "\uD83D\uDE80", "\uD83C\uDF08", "\uD83C\uDF82",
-    "\uD83C\uDF83", "\uD83D\uDC7B", "\uD83E\uDD21", "\uD83D\uDC36", "\uD83D\uDC31"
-)
-
-@Composable
-private fun StickerPanel(
-    onStickerSelected: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-            .padding(12.dp)
-    ) {
-        Text(
-            text = "Stickers",
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(5),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.height(220.dp)
-        ) {
-            gridItems(stickerList) { sticker ->
-                Box(
-                    modifier = Modifier
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onStickerSelected(sticker) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = sticker, fontSize = 32.sp)
-                }
-            }
-        }
-    }
-}
-
-private fun extractCoordsFromUrl(url: String): Pair<String, String>? {
-    val regex = Regex("""query=(-?\d+\.?\d*),(-?\d+\.?\d*)""")
-    val match = regex.find(url) ?: return null
-    return Pair(match.groupValues[1], match.groupValues[2])
 }
