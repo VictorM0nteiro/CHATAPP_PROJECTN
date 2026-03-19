@@ -26,7 +26,8 @@ class ProfileRepository {
             profilePictureUrl = data["profilePictureUrl"] as? String,
             status = data["status"] as? String ?: "",
             updateStatus = data["updateStatus"] as? String ?: "",
-            updateStatusTimestamp = (data["updateStatusTimestamp"] as? Long) ?: 0L
+            updateStatusTimestamp = (data["updateStatusTimestamp"] as? Long) ?: 0L,
+            presenceStatus = data["presenceStatus"] as? String ?: "offline"
         )
     }
 
@@ -66,6 +67,12 @@ class ProfileRepository {
         val updatedUser = updatedUserSnapshot.getValue(User::class.java) ?: return
 
         propagateProfileUpdates(updatedUser)
+    }
+
+    suspend fun updatePresenceStatus(presenceStatus: String) {
+        val userId = auth.currentUser?.uid ?: return
+        database.getReference("users").child(userId)
+            .child("presenceStatus").setValue(presenceStatus).await()
     }
 
     private suspend fun propagateProfileUpdates(updatedUser: User) {
