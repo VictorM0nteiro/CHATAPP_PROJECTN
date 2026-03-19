@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(keytool -list -v -keystore \"C:/Users/User/.android/debug.keystore\" -alias androiddebugkey -storepass android -keypass android)"
+    ]
+  }
+}

@@ -64,7 +64,7 @@ import androidx.navigation.NavController
 import com.example.app_mensagem.R
 import com.example.app_mensagem.presentation.viewmodel.AuthUiState
 import com.example.app_mensagem.presentation.viewmodel.AuthViewModel
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 
@@ -73,6 +73,7 @@ fun LoginScreen(navController: NavController, viewModel: AuthViewModel) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var googleSignInError by remember { mutableStateOf<String?>(null) }
 
     val authState by viewModel.uiState.collectAsState()
     val primary = MaterialTheme.colorScheme.primary
@@ -274,12 +275,10 @@ fun LoginScreen(navController: NavController, viewModel: AuthViewModel) {
                                 try {
                                     val credentialManager = CredentialManager.create(context)
                                     val webClientId = context.getString(R.string.default_web_client_id)
-                                    val googleIdOption = GetGoogleIdOption.Builder()
-                                        .setFilterByAuthorizedAccounts(false)
-                                        .setServerClientId(webClientId)
+                                    val googleSignInOption = GetSignInWithGoogleOption.Builder(webClientId)
                                         .build()
                                     val request = GetCredentialRequest.Builder()
-                                        .addCredentialOption(googleIdOption)
+                                        .addCredentialOption(googleSignInOption)
                                         .build()
                                     val result = credentialManager.getCredential(context = context, request = request)
                                     val credential = result.credential
@@ -289,8 +288,10 @@ fun LoginScreen(navController: NavController, viewModel: AuthViewModel) {
                                     }
                                 } catch (e: NoCredentialException) {
                                     Log.w("LoginScreen", "Nenhuma conta Google encontrada.")
+                                    googleSignInError = "Nenhuma conta Google encontrada no dispositivo. Adicione uma conta em Configurações."
                                 } catch (e: Exception) {
                                     Log.e("LoginScreen", "Erro no Google Sign-In: ${e.message}")
+                                    googleSignInError = "Erro ao entrar com Google. Tente novamente."
                                 }
                             }
                         },
@@ -302,6 +303,16 @@ fun LoginScreen(navController: NavController, viewModel: AuthViewModel) {
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1A1A2E))
                     ) {
                         Text("G  Entrar com Google", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    }
+
+                    if (googleSignInError != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = googleSignInError!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
