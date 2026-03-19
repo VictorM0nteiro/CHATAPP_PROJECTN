@@ -72,6 +72,7 @@ dependencies {
 
     // Cloudinary
     implementation("com.cloudinary:cloudinary-android:3.0.2")
+    implementation(libs.androidx.media3.ui)
 
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
