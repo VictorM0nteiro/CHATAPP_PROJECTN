@@ -641,9 +641,12 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                     }
 
                     LaunchedEffect(uiState.chatItems.size) {
-                        if (uiState.chatItems.isNotEmpty()) {
+                        val lastIndex = uiState.chatItems.lastIndex
+                        if (lastIndex >= 0) {
                             scope.launch {
-                                listState.animateScrollToItem(uiState.chatItems.lastIndex)
+                                try {
+                                    listState.animateScrollToItem(lastIndex)
+                                } catch (_: Exception) {}
                             }
                         }
                     }
