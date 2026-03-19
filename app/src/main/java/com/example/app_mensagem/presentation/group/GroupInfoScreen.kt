@@ -125,16 +125,20 @@ fun GroupInfoScreen(
         )
     }
 
-    val selectedUserHandle = navController.currentBackStackEntry?.savedStateHandle
-    LaunchedEffect(selectedUserHandle) {
-        selectedUserHandle?.getLiveData<String>("selectedUserId")?.observeForever { userId ->
-            if (userId != null && groupId != null) {
-                val isAlreadyMember = uiState.members.any { it.uid == userId }
-                if (!isAlreadyMember) {
-                    groupInfoViewModel.addMember(groupId, userId)
-                }
-                selectedUserHandle.remove<String>("selectedUserId")
+    val selectedUserId = navController.currentBackStackEntry
+        ?.savedStateHandle
+        ?.getStateFlow<String?>("selectedUserId", null)
+        ?.collectAsState()?.value
+
+    LaunchedEffect(selectedUserId) {
+        if (selectedUserId != null && groupId != null) {
+            val isAlreadyMember = uiState.members.any { it.uid == selectedUserId }
+            if (!isAlreadyMember) {
+                groupInfoViewModel.addMember(groupId, selectedUserId)
             }
+            navController.currentBackStackEntry
+                ?.savedStateHandle
+                ?.remove<String>("selectedUserId")
         }
     }
 
