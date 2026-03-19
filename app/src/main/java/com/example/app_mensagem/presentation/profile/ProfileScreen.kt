@@ -1,9 +1,13 @@
 package com.example.app_mensagem.presentation.profile
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,8 +34,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.ModeEdit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Update
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +49,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -61,6 +68,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import java.io.File
+import java.io.FileOutputStream
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -85,14 +96,55 @@ fun ProfileScreen(
     val primary = MaterialTheme.colorScheme.primary
 
     var name by remember(user?.uid) { mutableStateOf(user?.name ?: "") }
+    var phoneNumber by remember(user?.uid) { mutableStateOf(user?.phoneNumber ?: "") }
     var status by remember(user?.uid) { mutableStateOf(user?.status ?: "") }
     var updateStatus by remember(user?.uid) { mutableStateOf(user?.updateStatus ?: "") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var showImageSourceDialog by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri -> imageUri = uri }
     )
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            val file = File(context.cacheDir, "profile_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            imageUri = Uri.fromFile(file)
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) cameraLauncher.launch(null) }
+
+    if (showImageSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = { Text("Escolher foto") },
+            text = { Text("Como deseja adicionar a foto?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+                        cameraLauncher.launch(null)
+                    else
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }) { Text("Câmera") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    imagePickerLauncher.launch("image/*")
+                }) { Text("Galeria") }
+            }
+        )
+    }
+
+    LaunchedEffect(Unit) { profileViewModel.loadProfile() }
 
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) {
@@ -155,7 +207,7 @@ fun ProfileScreen(
                                 .clip(CircleShape)
                                 .border(4.dp, Color.White, CircleShape)
                                 .shadow(4.dp, CircleShape)
-                                .clickable { imagePickerLauncher.launch("image/*") },
+                                .clickable { showImageSourceDialog = true },
                             contentScale = ContentScale.Crop
                         )
                         Box(
@@ -215,6 +267,24 @@ fun ProfileScreen(
                             disabledLabelColor = Color.Gray,
                             disabledTextColor = Color.Gray,
                             disabledLeadingIconColor = Color.Gray
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = phoneNumber,
+                        onValueChange = { phoneNumber = it },
+                        label = { Text("Telefone") },
+                        leadingIcon = { Icon(Icons.Default.Phone, null, tint = primary) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = primary,
+                            unfocusedBorderColor = Color(0xFFE0E0E0),
+                            focusedLabelColor = primary
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -336,6 +406,7 @@ fun ProfileScreen(
                     onClick = {
                         profileViewModel.updateProfile(
                             name = name,
+                            phoneNumber = phoneNumber,
                             status = status,
                             updateStatus = updateStatus,
                             imageUri = imageUri

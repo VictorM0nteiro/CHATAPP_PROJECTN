@@ -100,6 +100,7 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(authState) {
                         if (authState is AuthUiState.SignedOut) {
+                            statusViewModel.clearState()
                             navController.navigate("login") {
                                 popUpTo(0) { inclusive = true }
                             }

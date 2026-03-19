@@ -16,11 +16,23 @@ class ProfileRepository {
     suspend fun getUserProfile(): User? {
         val userId = auth.currentUser?.uid ?: return null
         val snapshot = database.getReference("users").child(userId).get().await()
-        return snapshot.getValue(User::class.java)
+        val data = snapshot.value as? Map<*, *> ?: return null
+        return User(
+            uid = data["uid"] as? String ?: userId,
+            name = data["name"] as? String ?: "",
+            email = data["email"] as? String ?: "",
+            phoneNumber = data["phoneNumber"] as? String ?: "",
+            fcmToken = data["fcmToken"] as? String ?: "",
+            profilePictureUrl = data["profilePictureUrl"] as? String,
+            status = data["status"] as? String ?: "",
+            updateStatus = data["updateStatus"] as? String ?: "",
+            updateStatusTimestamp = (data["updateStatusTimestamp"] as? Long) ?: 0L
+        )
     }
 
     suspend fun updateProfile(
         name: String,
+        phoneNumber: String,
         status: String,
         updateStatus: String,
         imageUri: Uri?
@@ -39,6 +51,7 @@ class ProfileRepository {
 
         val updates = mutableMapOf<String, Any?>()
         updates["name"] = name
+        updates["phoneNumber"] = phoneNumber
         updates["status"] = status
         updates["updateStatus"] = updateStatus
         updates["updateStatusTimestamp"] = System.currentTimeMillis()

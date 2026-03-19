@@ -100,4 +100,8 @@ class StatusViewModel : ViewModel() {
 
     fun resetPostState() { _postState.value = StatusPostState.Idle }
     fun getCurrentUserId() = repository.getCurrentUserId()
+
+    fun clearState() {
+        _uiState.value = StatusUiState.Loading
+    }
 }
