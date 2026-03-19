@@ -29,6 +29,13 @@ sealed class PhoneSearchState {
     object NotFound : PhoneSearchState()
 }
 
+sealed class GroupCreationState {
+    object Idle : GroupCreationState()
+    object Creating : GroupCreationState()
+    object Success : GroupCreationState()
+    data class Error(val message: String) : GroupCreationState()
+}
+
 class ContactsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: ChatRepository
@@ -41,6 +48,9 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
 
     private val _phoneSearchState = MutableStateFlow<PhoneSearchState>(PhoneSearchState.Idle)
     val phoneSearchState: StateFlow<PhoneSearchState> = _phoneSearchState
+
+    private val _groupCreationState = MutableStateFlow<GroupCreationState>(GroupCreationState.Idle)
+    val groupCreationState: StateFlow<GroupCreationState> = _groupCreationState
 
     init {
         val db = (application as MyApplication).database
@@ -123,12 +133,20 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
 
     fun createGroup(name: String, memberIds: List<String>) {
         viewModelScope.launch {
+            _groupCreationState.value = GroupCreationState.Creating
             try {
                 repository.createGroup(name, memberIds)
+                _groupCreationState.value = GroupCreationState.Success
             } catch (e: Exception) {
-                _uiState.value = ContactsUiState.Error(e.message ?: "Falha ao criar grupo")
+                _groupCreationState.value = GroupCreationState.Error(
+                    e.message ?: "Falha ao criar grupo"
+                )
             }
         }
+    }
+
+    fun resetGroupCreationState() {
+        _groupCreationState.value = GroupCreationState.Idle
     }
 
     fun onNavigated() {
