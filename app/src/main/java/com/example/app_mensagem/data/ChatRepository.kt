@@ -130,11 +130,28 @@ class ChatRepository(
 
     suspend fun getUsers(): List<User> {
         val currentUserId = auth.currentUser?.uid
+        val blockedIds = getBlockedUserIds()
         val snapshot = database.getReference("users").get().await()
 
         return snapshot.children
             .mapNotNull { it.getValue(User::class.java) }
-            .filter { it.uid != currentUserId }
+            .filter { it.uid != currentUserId && it.uid !in blockedIds }
+    }
+
+    suspend fun getBlockedUserIds(): Set<String> {
+        val currentUserId = auth.currentUser?.uid ?: return emptySet()
+        val snapshot = database.getReference("user-blocks/$currentUserId").get().await()
+        return snapshot.children.mapNotNull { it.key }.toSet()
+    }
+
+    suspend fun blockUser(targetUserId: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        database.getReference("user-blocks/$currentUserId/$targetUserId").setValue(true).await()
+    }
+
+    suspend fun unblockUser(targetUserId: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        database.getReference("user-blocks/$currentUserId/$targetUserId").removeValue().await()
     }
 
     suspend fun searchUserByPhone(phoneNumber: String): User? {
@@ -245,16 +262,12 @@ class ChatRepository(
     }
 
     private fun decryptMessageIfNeeded(message: Message, conversationId: String): Message {
-        return if (message.type == "TEXT" || message.type == "LOCATION") {
-            try {
-                message.copy(
-                    conversationId = conversationId,
-                    content = EncryptionUtils.decrypt(message.content)
-                )
-            } catch (_: Exception) {
-                message.copy(conversationId = conversationId)
-            }
-        } else {
+        return try {
+            message.copy(
+                conversationId = conversationId,
+                content = EncryptionUtils.decrypt(message.content)
+            )
+        } catch (_: Exception) {
             message.copy(conversationId = conversationId)
         }
     }
@@ -323,11 +336,7 @@ class ChatRepository(
         val messagesRef = database.getReference(path).child(conversationId)
         val messageId = messagesRef.push().key ?: return
 
-        val encryptedContent = if (type == "TEXT" || type == "LOCATION") {
-            EncryptionUtils.encrypt(content)
-        } else {
-            content
-        }
+        val encryptedContent = EncryptionUtils.encrypt(content)
 
         val localMessage = Message(
             id = messageId,
@@ -383,7 +392,8 @@ class ChatRepository(
             status = "SENT"
         )
 
-        messagesRef.child(messageId).setValue(message).await()
+        val encryptedMessage = message.copy(content = EncryptionUtils.encrypt(stickerId))
+        messagesRef.child(messageId).setValue(encryptedMessage).await()
         messageDao.insertOrUpdate(message)
         updateLastMessageForConversation(conversationId, "Figurinha", message.timestamp, isGroup)
     }
@@ -507,7 +517,8 @@ class ChatRepository(
                 status = "SENT"
             )
 
-            messagesRef.child(messageId).setValue(sentMessage).await()
+            val encryptedSentMessage = sentMessage.copy(content = EncryptionUtils.encrypt(mediaUrl))
+            messagesRef.child(messageId).setValue(encryptedSentMessage).await()
             messageDao.insertOrUpdate(sentMessage)
 
             val lastMessageText = when (normalizedType) {

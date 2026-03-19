@@ -134,4 +134,28 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
     fun onNavigated() {
         _navigationState.value = ContactNavigationState.Idle
     }
+
+    fun blockUser(userId: String) {
+        viewModelScope.launch {
+            try {
+                repository.blockUser(userId)
+                loadUsers() // refresh list
+                Toast.makeText(getApplication(), "Usuário bloqueado.", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                _uiState.value = ContactsUiState.Error(e.message ?: "Falha ao bloquear usuário.")
+            }
+        }
+    }
+
+    fun unblockUser(userId: String) {
+        viewModelScope.launch {
+            try {
+                repository.unblockUser(userId)
+                loadUsers()
+                Toast.makeText(getApplication(), "Usuário desbloqueado.", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                _uiState.value = ContactsUiState.Error(e.message ?: "Falha ao desbloquear.")
+            }
+        }
+    }
 }

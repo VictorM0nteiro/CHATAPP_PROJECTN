@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.app_mensagem.MyApplication
 import com.example.app_mensagem.data.ChatRepository
 import com.example.app_mensagem.data.model.Conversation
+import com.example.app_mensagem.services.NetworkObserver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -58,6 +59,15 @@ class ConversationsViewModel(application: Application) : AndroidViewModel(applic
                 _uiState.value = ConversationUiState.Error(
                     e.message ?: "Erro ao carregar conversas."
                 )
+            }
+        }
+
+        // Auto-sync when network comes back online
+        viewModelScope.launch {
+            NetworkObserver(application).observe().collect { isOnline ->
+                if (isOnline) {
+                    repository.syncUserConversations()
+                }
             }
         }
     }

@@ -69,4 +69,17 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun clearSavedFlag() {
         _uiState.value = _uiState.value.copy(isSaved = false)
     }
+
+    fun updatePrivacySettings(lastSeen: String, profilePhoto: String, status: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                repository.updatePrivacySettings(lastSeen, profilePhoto, status)
+                val user = repository.getUserProfile()
+                _uiState.value = ProfileUiState(isLoading = false, user = user, isSaved = true)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+            }
+        }
+    }
 }

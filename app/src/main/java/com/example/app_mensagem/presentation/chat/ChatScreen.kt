@@ -66,14 +66,22 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import android.media.MediaPlayer
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -910,36 +918,10 @@ private fun MessageBubble(
                         }
 
                         "AUDIO" -> {
-                            val audioContext = LocalContext.current
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable {
-                                    val intent = android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse(message.content)
-                                    ).apply { addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-                                    try {
-                                        audioContext.startActivity(intent)
-                                    } catch (_: Exception) {}
-                                }
-                            ) {
-                                Icon(
-                                    Icons.Default.PlayArrow,
-                                    contentDescription = "Reproduzir áudio",
-                                    tint = contentColor
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    Icons.Default.GraphicEq,
-                                    contentDescription = null,
-                                    tint = contentColor
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Mensagem de voz",
-                                    color = contentColor
-                                )
-                            }
+                            AudioMessagePlayer(
+                                url = message.content,
+                                contentColor = contentColor
+                            )
                         }
 
                         "DOCUMENT" -> {
@@ -1230,4 +1212,133 @@ private fun MessageActionsBar(
             }
         }
     }
+}
+
+@Composable
+private fun AudioMessagePlayer(url: String, contentColor: Color) {
+    var isPlaying by remember { mutableStateOf(false) }
+    var isPrepared by remember { mutableStateOf(false) }
+    var progress by remember { mutableFloatStateOf(0f) }
+    var duration by remember { mutableIntStateOf(0) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val mediaPlayer = remember {
+        MediaPlayer().apply {
+            setOnPreparedListener {
+                isPrepared = true
+                isLoading = false
+                duration = it.duration
+            }
+            setOnCompletionListener {
+                isPlaying = false
+                progress = 0f
+                seekTo(0)
+            }
+            setOnErrorListener { _, _, _ ->
+                isLoading = false
+                isPlaying = false
+                true
+            }
+        }
+    }
+
+    DisposableEffect(url) {
+        onDispose {
+            mediaPlayer.stop()
+            mediaPlayer.release()
+        }
+    }
+
+    // Poll progress while playing
+    LaunchedEffect(isPlaying) {
+        while (isPlaying) {
+            if (isPrepared && mediaPlayer.isPlaying) {
+                val dur = mediaPlayer.duration.takeIf { it > 0 } ?: 1
+                progress = mediaPlayer.currentPosition.toFloat() / dur
+            }
+            delay(200)
+        }
+    }
+
+    fun togglePlay() {
+        if (!isPrepared) {
+            isLoading = true
+            try {
+                mediaPlayer.setDataSource(url)
+                mediaPlayer.prepareAsync()
+                mediaPlayer.setOnPreparedListener { mp ->
+                    isPrepared = true
+                    isLoading = false
+                    duration = mp.duration
+                    mp.start()
+                    isPlaying = true
+                }
+            } catch (_: Exception) {
+                isLoading = false
+            }
+        } else {
+            if (isPlaying) {
+                mediaPlayer.pause()
+                isPlaying = false
+            } else {
+                mediaPlayer.start()
+                isPlaying = true
+            }
+        }
+    }
+
+    Column(modifier = Modifier.width(200.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { togglePlay() },
+                modifier = Modifier.size(36.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = contentColor
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pausar" else "Reproduzir",
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+            Slider(
+                value = progress,
+                onValueChange = { newVal ->
+                    if (isPrepared) {
+                        progress = newVal
+                        mediaPlayer.seekTo((newVal * mediaPlayer.duration).toInt())
+                    }
+                },
+                modifier = Modifier.weight(1f).height(24.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = contentColor,
+                    activeTrackColor = contentColor,
+                    inactiveTrackColor = contentColor.copy(alpha = 0.3f)
+                )
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 36.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            val elapsed = if (isPrepared && duration > 0) (progress * duration).toInt() else 0
+            Text(formatAudioTime(elapsed), fontSize = 10.sp, color = contentColor.copy(alpha = 0.7f))
+            Text(formatAudioTime(duration), fontSize = 10.sp, color = contentColor.copy(alpha = 0.7f))
+        }
+    }
+}
+
+private fun formatAudioTime(ms: Int): String {
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(minutes, seconds)
 }

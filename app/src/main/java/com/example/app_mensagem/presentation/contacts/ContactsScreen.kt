@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -26,11 +28,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,6 +49,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -79,7 +84,7 @@ import com.example.app_mensagem.presentation.viewmodel.ContactsViewModel
 import com.example.app_mensagem.presentation.viewmodel.PhoneSearchState
 import com.google.gson.Gson
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ContactsScreen(
     navController: NavController,
@@ -91,8 +96,27 @@ fun ContactsScreen(
     val phoneSearchState by contactsViewModel.phoneSearchState.collectAsState()
     val selectedUsers = remember { mutableStateListOf<User>() }
     var phoneQuery by remember { mutableStateOf("") }
+    var userToBlock by remember { mutableStateOf<User?>(null) }
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Block confirmation dialog
+    userToBlock?.let { user ->
+        AlertDialog(
+            onDismissRequest = { userToBlock = null },
+            title = { Text("Bloquear contato") },
+            text = { Text("Deseja bloquear ${user.name}? Ele não aparecerá mais na sua lista de contatos.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    contactsViewModel.blockUser(user.uid)
+                    userToBlock = null
+                }) { Text("Bloquear", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { userToBlock = null }) { Text("Cancelar") }
+            }
+        )
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -351,7 +375,8 @@ fun ContactsScreen(
                                                 if (isSelected) selectedUsers.removeAll { it.uid == user.uid }
                                                 else selectedUsers.add(user)
                                             }
-                                        }
+                                        },
+                                        onLongClick = { userToBlock = user }
                                     )
                                     HorizontalDivider(modifier = Modifier.padding(start = 74.dp))
                                 }
@@ -371,16 +396,18 @@ fun ContactsScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun UserItem(
     user: User,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
                 else Color.Transparent

@@ -13,5 +13,9 @@ data class User(
     val profilePictureUrl: String? = null,
     val status: String = "",
     val updateStatus: String = "",
-    val updateStatusTimestamp: Long = 0L
+    val updateStatusTimestamp: Long = 0L,
+    // Privacy: "everyone" | "nobody"
+    val lastSeenPrivacy: String = "everyone",
+    val profilePhotoPrivacy: String = "everyone",
+    val statusPrivacy: String = "everyone"
 )
