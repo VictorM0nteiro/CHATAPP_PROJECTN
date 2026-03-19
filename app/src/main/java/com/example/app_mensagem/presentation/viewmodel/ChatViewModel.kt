@@ -13,6 +13,7 @@ import com.example.app_mensagem.data.ChatRepository
 import com.example.app_mensagem.data.model.Conversation
 import com.example.app_mensagem.data.model.Message
 import com.example.app_mensagem.data.model.User
+import com.google.firebase.auth.FirebaseAuth
 import com.example.app_mensagem.presentation.chat.ChatItem
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +44,8 @@ data class ChatUiState(
     val mediaType: String? = null,
     val mediaFileName: String? = null,
     val groupMembers: Map<String, User> = emptyMap(),
-    val isRecording: Boolean = false
+    val isRecording: Boolean = false,
+    val otherUserPresenceStatus: String = "offline"
 )
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -166,11 +168,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     null
                 }
 
+                var presenceStatus = _uiState.value.otherUserPresenceStatus
+                if (!conversation.isGroup) {
+                    val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                    val otherUid = conversationId.replace(currentUid, "").replace("-", "")
+                    if (otherUid.isNotBlank()) {
+                        presenceStatus = try {
+                            repository.getUserPresenceStatus(otherUid)
+                        } catch (_: Exception) { "offline" }
+                    }
+                }
+
                 _uiState.value = _uiState.value.copy(
                     conversationTitle = conversation.name,
                     conversation = conversation,
                     groupMembers = membersMap,
-                    pinnedMessage = pinnedMessage
+                    pinnedMessage = pinnedMessage,
+                    otherUserPresenceStatus = presenceStatus
                 )
             }
         }
