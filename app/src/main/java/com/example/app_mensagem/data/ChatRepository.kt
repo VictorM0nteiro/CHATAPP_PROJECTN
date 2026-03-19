@@ -15,6 +15,7 @@ import com.example.app_mensagem.data.model.Group
 import com.example.app_mensagem.data.model.Message
 import com.example.app_mensagem.data.model.User
 import com.example.app_mensagem.services.EncryptionUtils
+import com.example.app_mensagem.services.FcmSender
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -370,6 +371,7 @@ class ChatRepository(
                 timestamp = localMessage.timestamp,
                 isGroup = isGroup
             )
+            sendPushNotification(conversationId, isGroup, type)
         } catch (e: Exception) {
             messageDao.insertOrUpdate(localMessage.copy(status = "FAILED"))
             Log.e("ChatRepository", "Erro ao enviar mensagem: ${e.message}", e)
@@ -396,6 +398,7 @@ class ChatRepository(
         messagesRef.child(messageId).setValue(encryptedMessage).await()
         messageDao.insertOrUpdate(message)
         updateLastMessageForConversation(conversationId, "Figurinha", message.timestamp, isGroup)
+        sendPushNotification(conversationId, isGroup, "STICKER")
     }
 
     private suspend fun generateAndUploadThumbnailToCloudinary(
@@ -536,6 +539,7 @@ class ChatRepository(
                 timestamp = timestamp,
                 isGroup = isGroup
             )
+            sendPushNotification(conversationId, isGroup, normalizedType)
         } catch (e: Exception) {
             Log.e("ChatRepository", "Erro ao enviar mídia: ${e.message}", e)
             messageDao.insertOrUpdate(sendingMessage.copy(status = "FAILED"))
@@ -588,6 +592,53 @@ class ChatRepository(
 
         conversationDao.insertOrUpdate(conversationForCurrentUser)
         return conversationId
+    }
+
+    private suspend fun sendPushNotification(
+        conversationId: String,
+        isGroup: Boolean,
+        messageType: String
+    ) {
+        val currentUserId = auth.currentUser?.uid ?: return
+
+        val bodyText = when (messageType.uppercase()) {
+            "IMAGE" -> "📷 Foto"
+            "VIDEO" -> "🎥 Vídeo"
+            "AUDIO" -> "🎵 Áudio"
+            "DOCUMENT" -> "📄 Documento"
+            "LOCATION" -> "📍 Localização"
+            "STICKER" -> "🎭 Figurinha"
+            else -> "Nova mensagem"
+        }
+
+        val senderName = database.getReference("users/$currentUserId/name")
+            .get().await().getValue(String::class.java) ?: "Alguém"
+
+        val recipientIds: List<String>
+        val title: String
+        val body: String
+
+        if (isGroup) {
+            val groupSnap = database.getReference("groups/$conversationId").get().await()
+            val groupName = groupSnap.child("name").getValue(String::class.java) ?: "Grupo"
+            recipientIds = groupSnap.child("members").children
+                .mapNotNull { it.key }
+                .filter { it != currentUserId }
+            title = groupName
+            body = "$senderName: $bodyText"
+        } else {
+            // ConversationId para 1:1 é "uid1-uid2" — extrai o outro participante diretamente
+            recipientIds = conversationId.split("-")
+                .filter { it != currentUserId && it.isNotBlank() }
+            title = senderName
+            body = bodyText
+        }
+
+        recipientIds.forEach { uid ->
+            val token = database.getReference("users/$uid/fcmToken")
+                .get().await().getValue(String::class.java) ?: return@forEach
+            FcmSender.send(token, title, body, conversationId, isGroup)
+        }
     }
 
     private fun getConversationId(userId1: String, userId2: String): String {
