@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WbSunny
@@ -224,10 +223,9 @@ fun HomeScreen(
             ) {
                 val navItems = listOf(
                     Triple("Home", Icons.Default.Home, 0),
-                    Triple("Chamadas", Icons.Default.Phone, 1),
-                    Triple("Câmera", Icons.Default.CameraAlt, 2),
-                    Triple("Status", Icons.Default.WbSunny, 3),
-                    Triple("Contatos", Icons.Default.People, 4)
+                    Triple("Câmera", Icons.Default.CameraAlt, 1),
+                    Triple("Status", Icons.Default.WbSunny, 2),
+                    Triple("Contatos", Icons.Default.People, 3)
                 )
                 navItems.forEach { (label, icon, index) ->
                     NavigationBarItem(
@@ -235,10 +233,9 @@ fun HomeScreen(
                         onClick = {
                             selectedNavIndex = index
                             when (index) {
-                                1 -> navController.navigate("calls")
-                                2 -> openCamera()
-                                3 -> navController.navigate("status")
-                                4 -> navController.navigate("contacts")
+                                1 -> openCamera()
+                                2 -> navController.navigate("status")
+                                3 -> navController.navigate("contacts")
                                 else -> {}
                             }
                         },

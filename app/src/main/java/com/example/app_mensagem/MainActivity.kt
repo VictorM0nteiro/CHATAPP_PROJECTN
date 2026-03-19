@@ -21,8 +21,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.app_mensagem.presentation.calls.CallsScreen
-import com.example.app_mensagem.presentation.calls.OutgoingCallScreen
 import com.example.app_mensagem.presentation.status.AddStatusScreen
 import com.example.app_mensagem.presentation.status.StatusScreen
 import com.example.app_mensagem.presentation.status.StatusViewerScreen
@@ -41,7 +39,6 @@ import com.example.app_mensagem.presentation.viewmodel.AuthUiState
 import com.example.app_mensagem.presentation.viewmodel.AuthViewModel
 import com.example.app_mensagem.presentation.viewmodel.ContactsViewModel
 import com.example.app_mensagem.presentation.viewmodel.ConversationsViewModel
-import com.example.app_mensagem.presentation.viewmodel.CallsViewModel
 import com.example.app_mensagem.presentation.viewmodel.StatusViewModel
 import com.example.app_mensagem.presentation.viewmodel.GroupInfoViewModel
 import com.example.app_mensagem.presentation.viewmodel.ProfileViewModel
@@ -91,7 +88,6 @@ class MainActivity : ComponentActivity() {
                     val contactsViewModel: ContactsViewModel by viewModels()
                     val profileViewModel: ProfileViewModel by viewModels()
                     val groupInfoViewModel: GroupInfoViewModel by viewModels()
-                    val callsViewModel: CallsViewModel by viewModels()
                     val statusViewModel: StatusViewModel by viewModels()
 
                     LaunchedEffect(key1 = this.intent) {
@@ -141,10 +137,6 @@ class MainActivity : ComponentActivity() {
                             SessionsScreen(navController)
                         }
 
-                        composable("calls") {
-                            CallsScreen(navController, callsViewModel)
-                        }
-
                         composable("status") {
                             StatusScreen(navController, statusViewModel)
                         }
@@ -159,16 +151,6 @@ class MainActivity : ComponentActivity() {
                         ) { backStackEntry ->
                             val json = backStackEntry.arguments?.getString("statusListJson") ?: ""
                             StatusViewerScreen(navController, json, statusViewModel)
-                        }
-
-                        composable(
-                            route = "outgoing_call/{callRecordJson}",
-                            arguments = listOf(
-                                navArgument("callRecordJson") { type = NavType.StringType }
-                            )
-                        ) { backStackEntry ->
-                            val json = backStackEntry.arguments?.getString("callRecordJson") ?: ""
-                            OutgoingCallScreen(navController, json)
                         }
 
                         composable(
