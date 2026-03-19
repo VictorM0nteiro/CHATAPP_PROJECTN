@@ -392,7 +392,18 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                     PinnedMessageBar(
                         message = pinned,
                         currentUserId = FirebaseAuth.getInstance().currentUser?.uid,
-                        onClick = {},
+                        onClick = {
+                            val index = uiState.chatItems.indexOfFirst {
+                                it is ChatItem.MessageItem && it.message.id == pinned.id
+                            }
+                            if (index >= 0) {
+                                scope.launch {
+                                    try {
+                                        listState.animateScrollToItem(index)
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                        },
                         onUnpinClick = {
                             if (conversationId != null) {
                                 chatViewModel.onPinMessageClick(conversationId, pinned)
