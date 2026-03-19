@@ -10,5 +10,5 @@ data class StatusModel(
     val backgroundColor: String = "#FF4458",
     val timestamp: Long = 0L,
     val expiresAt: Long = 0L,          // timestamp + 24h
-    val viewers: Map<String, Long> = emptyMap()
+    val viewers: Map<String, Any> = emptyMap()
 )

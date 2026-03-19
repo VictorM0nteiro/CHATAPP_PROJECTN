@@ -1,8 +1,12 @@
 package com.example.app_mensagem.presentation.status
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,6 +42,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -47,6 +53,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import java.io.File
+import java.io.FileOutputStream
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,13 +87,52 @@ fun AddStatusScreen(
 ) {
     val postState by statusViewModel.postState.collectAsState()
     val primary = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var statusText by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf(statusColors.first()) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var showImageSourceDialog by remember { mutableStateOf(false) }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         selectedImageUri = uri
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            val file = File(context.cacheDir, "status_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            selectedImageUri = Uri.fromFile(file)
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) cameraLauncher.launch(null) }
+
+    if (showImageSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = { Text("Escolher imagem") },
+            text = { Text("Como deseja adicionar a imagem?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+                        cameraLauncher.launch(null)
+                    else
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }) { Text("Câmera") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    imagePicker.launch("image/*")
+                }) { Text("Galeria") }
+            }
+        )
     }
 
     LaunchedEffect(postState) {
@@ -217,7 +265,7 @@ fun AddStatusScreen(
                             .height(260.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(Color(0xFFE0E0E0))
-                            .clickable { imagePicker.launch("image/*") },
+                            .clickable { showImageSourceDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
                         if (selectedImageUri != null) {

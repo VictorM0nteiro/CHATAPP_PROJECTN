@@ -27,7 +27,7 @@ class StatusRepository {
         val now = System.currentTimeMillis()
         val snapshot = database.getReference("statuses").child(uid).get().await()
         return snapshot.children
-            .mapNotNull { it.getValue(StatusModel::class.java) }
+            .mapNotNull { runCatching { it.getValue(StatusModel::class.java) }.getOrNull() }
             .filter { it.expiresAt > now }
             .sortedBy { it.timestamp }
     }
@@ -39,11 +39,13 @@ class StatusRepository {
         val snapshot = database.getReference("statuses").get().await()
         val result = mutableMapOf<String, MutableList<StatusModel>>()
         snapshot.children.forEach { userNode ->
-            if (userNode.key == uid) return@forEach
+            val nodeUserId = userNode.key ?: return@forEach
+            if (nodeUserId == uid) return@forEach
             userNode.children.forEach { statusNode ->
-                val status = statusNode.getValue(StatusModel::class.java) ?: return@forEach
+                val status = runCatching { statusNode.getValue(StatusModel::class.java) }.getOrNull() ?: return@forEach
                 if (status.expiresAt > now) {
-                    result.getOrPut(status.userId) { mutableListOf() }.add(status)
+                    val key = status.userId.ifBlank { nodeUserId }
+                    result.getOrPut(key) { mutableListOf() }.add(status)
                 }
             }
         }
