@@ -5,18 +5,6 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-/**
- * Criptografia AES/GCM/NoPadding com chave compartilhada entre dispositivos.
- *
- * Vantagens sobre a implementação anterior (AES/ECB):
- *  - IV aleatório por mensagem → sem vazamento de padrões
- *  - Tag de autenticação GCM → detecta adulteração
- *  - Cobre todos os tipos de mensagem (texto, mídia, áudio, etc.)
- *
- * Nota: para E2E real entre usuários, seria necessário o protocolo Signal
- * (chaves assimétricas por par de usuários). Esta implementação protege os
- * dados em repouso no Firebase contra leitura direta no console.
- */
 object EncryptionUtils {
 
     private const val ALGORITHM = "AES"
@@ -24,8 +12,7 @@ object EncryptionUtils {
     private const val IV_SIZE = 12
     private const val TAG_SIZE = 128
 
-    // Chave de 32 bytes compartilhada por todos os clientes.
-    // Derivada de uma frase fixa padded para 256 bits.
+    // Chave compartilhada (igual em todos os dispositivos) — AES-256 GCM
     private val SHARED_KEY: SecretKeySpec by lazy {
         val raw = "ChatApp@Shared#Key2024!".toByteArray(Charsets.UTF_8)
         val keyBytes = ByteArray(32)
@@ -33,30 +20,43 @@ object EncryptionUtils {
         SecretKeySpec(keyBytes, ALGORITHM)
     }
 
+    // Chave legada usada antes (AES/ECB hardcoded)
+    private val LEGACY_KEY = SecretKeySpec("1234567890123456".toByteArray(), ALGORITHM)
+
     fun encrypt(value: String): String {
         return try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, SHARED_KEY)
-            val iv = cipher.iv                                         // IV aleatório (12 bytes)
+            val iv = cipher.iv
             val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
-            val combined = iv + encrypted                              // IV + ciphertext + GCM tag
-            Base64.encodeToString(combined, Base64.NO_WRAP)
-        } catch (e: Exception) {
-            value // fallback: armazena sem cifrar se falhar
+            Base64.encodeToString(iv + encrypted, Base64.NO_WRAP)
+        } catch (_: Exception) {
+            value
         }
     }
 
     fun decrypt(value: String): String {
-        return try {
+        // Estratégia 1: AES/GCM com chave compartilhada (mensagens novas)
+        try {
             val combined = Base64.decode(value, Base64.NO_WRAP)
-            if (combined.size <= IV_SIZE) return value
-            val iv = combined.copyOfRange(0, IV_SIZE)
-            val ciphertext = combined.copyOfRange(IV_SIZE, combined.size)
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, SHARED_KEY, GCMParameterSpec(TAG_SIZE, iv))
-            String(cipher.doFinal(ciphertext), Charsets.UTF_8)
-        } catch (e: Exception) {
-            value // fallback: retorna valor bruto (mensagens antigas ou sem cifra)
-        }
+            if (combined.size > IV_SIZE) {
+                val iv = combined.copyOfRange(0, IV_SIZE)
+                val ciphertext = combined.copyOfRange(IV_SIZE, combined.size)
+                val cipher = Cipher.getInstance(TRANSFORMATION)
+                cipher.init(Cipher.DECRYPT_MODE, SHARED_KEY, GCMParameterSpec(TAG_SIZE, iv))
+                return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+            }
+        } catch (_: Exception) {}
+
+        // Estratégia 2: AES/ECB com chave legada (mensagens antigas)
+        try {
+            val cipher = Cipher.getInstance("AES")
+            cipher.init(Cipher.DECRYPT_MODE, LEGACY_KEY)
+            val decoded = Base64.decode(value, Base64.NO_WRAP)
+            return String(cipher.doFinal(decoded), Charsets.UTF_8)
+        } catch (_: Exception) {}
+
+        // Estratégia 3: já é texto plano
+        return value
     }
 }
