@@ -65,17 +65,30 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
             _phoneSearchState.value = PhoneSearchState.Idle
             return
         }
-        viewModelScope.launch {
-            _phoneSearchState.value = PhoneSearchState.Searching
-            try {
-                val user = repository.searchUserByPhone(phoneNumber.trim())
-                _phoneSearchState.value = if (user != null) {
-                    PhoneSearchState.Found(user)
-                } else {
-                    PhoneSearchState.NotFound
+        val query = phoneNumber.trim()
+        val currentState = _uiState.value
+        if (currentState is ContactsUiState.Success) {
+            val found = currentState.users.firstOrNull { user ->
+                user.phoneNumber.contains(query, ignoreCase = true)
+            }
+            _phoneSearchState.value = if (found != null) {
+                PhoneSearchState.Found(found)
+            } else {
+                PhoneSearchState.NotFound
+            }
+        } else {
+            viewModelScope.launch {
+                _phoneSearchState.value = PhoneSearchState.Searching
+                try {
+                    val user = repository.searchUserByPhone(query)
+                    _phoneSearchState.value = if (user != null) {
+                        PhoneSearchState.Found(user)
+                    } else {
+                        PhoneSearchState.NotFound
+                    }
+                } catch (e: Exception) {
+                    _phoneSearchState.value = PhoneSearchState.NotFound
                 }
-            } catch (e: Exception) {
-                _phoneSearchState.value = PhoneSearchState.NotFound
             }
         }
     }
