@@ -1042,6 +1042,7 @@ private fun MessageBubble(
     val primaryColor = MaterialTheme.colorScheme.primary
     val backgroundColor = if (isMine) primaryColor else Color.White
     val contentColor = if (isMine) Color.White else Color(0xFF212121)
+    val context = LocalContext.current
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1199,17 +1200,72 @@ private fun MessageBubble(
                         }
 
                         "LOCATION" -> {
-                            Text(
-                                text = "\uD83D\uDCCD Localização",
-                                color = contentColor,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            HighlightingText(
-                                text = message.content,
-                                query = highlightQuery,
-                                color = contentColor
-                            )
+                            val coords = extractCoordsFromUrl(message.content)
+                            Column(
+                                modifier = Modifier.clickable {
+                                    try {
+                                        val intent = Intent(
+                                            Intent.ACTION_VIEW,
+                                            AndroidUri.parse(message.content)
+                                        )
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(140.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                ) {
+                                    if (coords != null) {
+                                        AsyncImage(
+                                            model = "https://maps.googleapis.com/maps/api/staticmap" +
+                                                    "?center=${coords.first},${coords.second}" +
+                                                    "&zoom=15&size=400x200" +
+                                                    "&markers=color:red%7C${coords.first},${coords.second}" +
+                                                    "&key=",
+                                            contentDescription = "Mapa",
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                if (coords != null) Color.Black.copy(alpha = 0.05f)
+                                                else primaryColor.copy(alpha = 0.1f)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (coords == null) {
+                                            Icon(
+                                                Icons.Default.LocationOn,
+                                                contentDescription = null,
+                                                tint = primaryColor,
+                                                modifier = Modifier.size(48.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = contentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (coords != null) "Abrir no Google Maps" else "Localização",
+                                        fontSize = 12.sp,
+                                        color = contentColor.copy(alpha = 0.8f),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
                         }
 
                         "STICKER" -> {
@@ -1406,4 +1462,10 @@ private fun MessageActionsBar(
             }
         }
     }
+}
+
+private fun extractCoordsFromUrl(url: String): Pair<String, String>? {
+    val regex = Regex("""query=(-?\d+\.?\d*),(-?\d+\.?\d*)""")
+    val match = regex.find(url) ?: return null
+    return Pair(match.groupValues[1], match.groupValues[2])
 }
