@@ -78,6 +78,7 @@ import com.example.app_mensagem.presentation.viewmodel.ContactsUiState
 import com.example.app_mensagem.presentation.viewmodel.ContactsViewModel
 import com.example.app_mensagem.presentation.viewmodel.PhoneSearchState
 import com.google.gson.Gson
+import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -146,7 +147,8 @@ fun ContactsScreen(
                             contactsViewModel.onUserClicked(selectedUsers.first())
                         } else {
                             val userIdsJson = Gson().toJson(selectedUsers.map { it.uid })
-                            navController.navigate("create_group/$userIdsJson")
+                            val encoded = URLEncoder.encode(userIdsJson, "UTF-8")
+                            navController.navigate("create_group/$encoded")
                         }
                     },
                     containerColor = MaterialTheme.colorScheme.primary
