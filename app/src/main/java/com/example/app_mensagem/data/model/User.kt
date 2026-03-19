@@ -13,5 +13,17 @@ data class User(
     val profilePictureUrl: String? = null,
     val status: String = "",
     val updateStatus: String = "",
-    val updateStatusTimestamp: Long = 0L
+    val updateStatusTimestamp: Long = 0L,
+    val presenceStatus: String = "offline"
 )
+
+enum class PresenceStatus(val key: String, val label: String) {
+    ONLINE("online", "Online"),
+    BUSY("busy", "Ocupado"),
+    OFFLINE("offline", "Offline");
+
+    companion object {
+        fun fromKey(key: String?): PresenceStatus =
+            entries.firstOrNull { it.key == key } ?: OFFLINE
+    }
+}
