@@ -29,13 +29,6 @@ sealed class PhoneSearchState {
     object NotFound : PhoneSearchState()
 }
 
-sealed class GroupCreationState {
-    object Idle : GroupCreationState()
-    object Creating : GroupCreationState()
-    object Success : GroupCreationState()
-    data class Error(val message: String) : GroupCreationState()
-}
-
 class ContactsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: ChatRepository
@@ -48,9 +41,6 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
 
     private val _phoneSearchState = MutableStateFlow<PhoneSearchState>(PhoneSearchState.Idle)
     val phoneSearchState: StateFlow<PhoneSearchState> = _phoneSearchState
-
-    private val _groupCreationState = MutableStateFlow<GroupCreationState>(GroupCreationState.Idle)
-    val groupCreationState: StateFlow<GroupCreationState> = _groupCreationState
 
     init {
         val db = (application as MyApplication).database
@@ -75,17 +65,30 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
             _phoneSearchState.value = PhoneSearchState.Idle
             return
         }
-        viewModelScope.launch {
-            _phoneSearchState.value = PhoneSearchState.Searching
-            try {
-                val user = repository.searchUserByPhone(phoneNumber.trim())
-                _phoneSearchState.value = if (user != null) {
-                    PhoneSearchState.Found(user)
-                } else {
-                    PhoneSearchState.NotFound
+        val query = phoneNumber.trim()
+        val currentState = _uiState.value
+        if (currentState is ContactsUiState.Success) {
+            val found = currentState.users.firstOrNull { user ->
+                user.phoneNumber.contains(query, ignoreCase = true)
+            }
+            _phoneSearchState.value = if (found != null) {
+                PhoneSearchState.Found(found)
+            } else {
+                PhoneSearchState.NotFound
+            }
+        } else {
+            viewModelScope.launch {
+                _phoneSearchState.value = PhoneSearchState.Searching
+                try {
+                    val user = repository.searchUserByPhone(query)
+                    _phoneSearchState.value = if (user != null) {
+                        PhoneSearchState.Found(user)
+                    } else {
+                        PhoneSearchState.NotFound
+                    }
+                } catch (e: Exception) {
+                    _phoneSearchState.value = PhoneSearchState.NotFound
                 }
-            } catch (e: Exception) {
-                _phoneSearchState.value = PhoneSearchState.NotFound
             }
         }
     }
@@ -120,20 +123,12 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
 
     fun createGroup(name: String, memberIds: List<String>) {
         viewModelScope.launch {
-            _groupCreationState.value = GroupCreationState.Creating
             try {
                 repository.createGroup(name, memberIds)
-                _groupCreationState.value = GroupCreationState.Success
             } catch (e: Exception) {
-                _groupCreationState.value = GroupCreationState.Error(
-                    e.message ?: "Falha ao criar grupo"
-                )
+                _uiState.value = ContactsUiState.Error(e.message ?: "Falha ao criar grupo")
             }
         }
-    }
-
-    fun resetGroupCreationState() {
-        _groupCreationState.value = GroupCreationState.Idle
     }
 
     fun onNavigated() {
