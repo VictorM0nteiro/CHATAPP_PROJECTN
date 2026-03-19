@@ -146,21 +146,21 @@ fun HomeScreen(
                         TextField(
                             value = searchQuery,
                             onValueChange = { conversationsViewModel.onSearchQueryChanged(it) },
-                            placeholder = { Text("Buscar conversas...", color = Color.White.copy(alpha = 0.7f)) },
+                            placeholder = { Text("Buscar conversas...", color = Color(0xFF9E9E9E)) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
                                 focusedIndicatorColor = Color.Transparent,
                                 unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = Color.White,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
+                                cursorColor = Color(0xFF212121),
+                                focusedTextColor = Color(0xFF212121),
+                                unfocusedTextColor = Color(0xFF212121)
                             ),
-                            textStyle = LocalTextStyle.current.copy(color = Color.White)
+                            textStyle = LocalTextStyle.current.copy(color = Color(0xFF212121))
                         )
                     } else {
-                        Text("Home", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text("Mensagens", fontWeight = FontWeight.Bold, fontSize = 22.sp)
                     }
                 },
                 navigationIcon = {
@@ -169,18 +169,18 @@ fun HomeScreen(
                             isSearchActive = false
                             conversationsViewModel.onSearchQueryChanged("")
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Fechar Busca", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Fechar Busca", tint = Color(0xFF212121))
                         }
                     } else {
                         IconButton(onClick = { isSearchActive = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Buscar", tint = Color.White)
+                            Icon(Icons.Default.Search, contentDescription = "Buscar", tint = Color(0xFF9E9E9E))
                         }
                     }
                 },
                 actions = {
                     if (!isSearchActive) {
                         IconButton(onClick = { showMenu = !showMenu }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
+                            Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color(0xFF212121))
                         }
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             DropdownMenuItem(
@@ -202,8 +202,8 @@ fun HomeScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = primaryColor,
-                    titleContentColor = Color.White
+                    containerColor = Color.White,
+                    titleContentColor = Color(0xFF212121)
                 )
             )
         },
