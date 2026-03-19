@@ -20,8 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountCircle
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -29,39 +27,36 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -77,7 +72,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -107,12 +101,12 @@ fun HomeScreen(
     authViewModel: AuthViewModel,
     conversationsViewModel: ConversationsViewModel = viewModel()
 ) {
-    var showMenu by remember { mutableStateOf(false) }
-    var isSearchActive by remember { mutableStateOf(false) }
     var selectedNavIndex by remember { mutableIntStateOf(0) }
     val conversationState by conversationsViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val primaryColor = MaterialTheme.colorScheme.primary
+
+    var searchQuery by remember { mutableStateOf("") }
 
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {}
     val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -138,82 +132,35 @@ fun HomeScreen(
     }
 
     Scaffold(
+        containerColor = Color.White,
         topBar = {
             TopAppBar(
                 title = {
-                    if (isSearchActive) {
-                        val searchQuery = (conversationState as? ConversationUiState.Success)?.searchQuery ?: ""
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = { conversationsViewModel.onSearchQueryChanged(it) },
-                            placeholder = { Text("Buscar conversas...", color = Color(0xFF9E9E9E)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = Color(0xFF212121),
-                                focusedTextColor = Color(0xFF212121),
-                                unfocusedTextColor = Color(0xFF212121)
-                            ),
-                            textStyle = LocalTextStyle.current.copy(color = Color(0xFF212121))
-                        )
-                    } else {
-                        Text("Mensagens", fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                    }
-                },
-                navigationIcon = {
-                    if (isSearchActive) {
-                        IconButton(onClick = {
-                            isSearchActive = false
-                            conversationsViewModel.onSearchQueryChanged("")
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Fechar Busca", tint = Color(0xFF212121))
-                        }
-                    } else {
-                        IconButton(onClick = { isSearchActive = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Buscar", tint = Color(0xFF9E9E9E))
-                        }
-                    }
+                    Text(
+                        text = "Mensagens",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp
+                    )
                 },
                 actions = {
-                    if (!isSearchActive) {
-                        IconButton(onClick = { showMenu = !showMenu }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color(0xFF212121))
-                        }
-                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Meu Perfil") },
-                                leadingIcon = { Icon(Icons.Default.AccountCircle, null) },
-                                onClick = {
-                                    showMenu = false
-                                    navController.navigate("profile")
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Sair") },
-                                onClick = {
-                                    showMenu = false
-                                    authViewModel.logout()
-                                }
-                            )
-                        }
+                    IconButton(onClick = { authViewModel.logout() }) {
+                        Icon(
+                            Icons.Default.ExitToApp,
+                            contentDescription = "Sair",
+                            tint = Color(0xFF9E9E9E)
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = Color(0xFF212121)
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { navController.navigate("contacts") },
                 containerColor = primaryColor,
-                shape = CircleShape
+                contentColor = Color.White
             ) {
-                Icon(Icons.Default.Edit, contentDescription = "Nova Conversa", tint = Color.White)
+                Icon(Icons.Default.Edit, contentDescription = "Nova Conversa")
             }
         },
         bottomBar = {
@@ -226,7 +173,8 @@ fun HomeScreen(
                     Triple("Chamadas", Icons.Default.Phone, 1),
                     Triple("Câmera", Icons.Default.CameraAlt, 2),
                     Triple("Status", Icons.Default.WbSunny, 3),
-                    Triple("Contatos", Icons.Default.People, 4)
+                    Triple("Contatos", Icons.Default.People, 4),
+                    Triple("Perfil", Icons.Default.Person, 5)
                 )
                 navItems.forEach { (label, icon, index) ->
                     NavigationBarItem(
@@ -238,6 +186,7 @@ fun HomeScreen(
                                 2 -> openCamera()
                                 3 -> navController.navigate("status")
                                 4 -> navController.navigate("contacts")
+                                5 -> navController.navigate("profile")
                                 else -> {}
                             }
                         },
@@ -263,23 +212,41 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFF5F5F5))
         ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = {
+                    searchQuery = it
+                    conversationsViewModel.onSearchQueryChanged(it)
+                },
+                placeholder = { Text("Buscar conversas...", color = Color(0xFF9E9E9E)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF9E9E9E)) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primaryColor,
+                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    unfocusedContainerColor = Color(0xFFF5F5F5),
+                    focusedContainerColor = Color(0xFFF5F5F5)
+                )
+            )
+
             when (val state = conversationState) {
                 is ConversationUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = primaryColor)
                     }
                 }
 
                 is ConversationUiState.Success -> {
-                    // Stories Row
                     StoriesRow(
                         conversations = state.conversations,
                         onAddStory = { navController.navigate("contacts") }
                     )
 
-                    // Tabs
                     ScrollableTabRow(
                         selectedTabIndex = state.selectedTab.ordinal,
                         edgePadding = 12.dp,
@@ -309,12 +276,24 @@ fun HomeScreen(
                     HorizontalDivider(color = Color(0xFFE0E0E0))
 
                     if (state.conversations.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            Text(
-                                text = if (state.searchQuery.isNotEmpty()) "Nenhum resultado encontrado." else "Nenhuma conversa encontrada.",
-                                modifier = Modifier.align(Alignment.Center),
-                                color = Color.Gray
-                            )
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(text = "\uD83D\uDCAC", fontSize = 48.sp)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = if (state.searchQuery.isNotEmpty()) "Nenhum resultado encontrado."
+                                    else "Nenhuma conversa ainda",
+                                    color = Color(0xFF9E9E9E),
+                                    fontSize = 15.sp
+                                )
+                                if (state.searchQuery.isEmpty()) {
+                                    Text(
+                                        text = "Toque no botão + para começar",
+                                        color = Color(0xFF9E9E9E),
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
                         }
                     } else {
                         LazyColumn(
@@ -332,7 +311,8 @@ fun HomeScreen(
                                 )
                                 HorizontalDivider(
                                     modifier = Modifier.padding(start = 80.dp),
-                                    color = Color(0xFFF0F0F0)
+                                    color = Color(0xFFF0F0F0),
+                                    thickness = 0.5.dp
                                 )
                             }
                         }
@@ -340,8 +320,8 @@ fun HomeScreen(
                 }
 
                 is ConversationUiState.Error -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Text("Erro: ${state.message}", modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.error)
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Erro: ${state.message}", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -363,7 +343,6 @@ fun StoriesRow(
         contentPadding = PaddingValues(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // My Story item
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -448,13 +427,12 @@ fun ConversationItem(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
         Box {
             AsyncImage(
                 model = conversation.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
                 contentDescription = "Foto de ${conversation.name}",
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(52.dp)
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
@@ -472,24 +450,21 @@ fun ConversationItem(
             }
         }
 
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = conversation.name,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-            }
-            Spacer(modifier = Modifier.height(3.dp))
             Text(
-                text = conversation.lastMessage,
+                text = conversation.name,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = conversation.lastMessage.ifBlank { "Sem mensagens" },
                 fontSize = 13.sp,
-                color = Color.Gray,
+                color = Color(0xFF9E9E9E),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -501,7 +476,7 @@ fun ConversationItem(
             Text(
                 text = formatTimestamp(conversation.timestamp),
                 fontSize = 11.sp,
-                color = Color.Gray
+                color = Color(0xFF9E9E9E)
             )
             if (!conversation.isGroup) {
                 IconButton(onClick = onFavoriteClick, modifier = Modifier.size(20.dp)) {
