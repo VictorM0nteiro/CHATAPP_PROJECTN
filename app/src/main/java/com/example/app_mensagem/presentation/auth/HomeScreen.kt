@@ -1,5 +1,11 @@
 package com.example.app_mensagem.presentation.home
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.provider.MediaStore
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,20 +26,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.provider.MediaStore
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.core.content.ContextCompat
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
@@ -45,8 +43,8 @@ import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.TextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -60,6 +58,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -73,15 +72,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -143,9 +143,9 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     if (isSearchActive) {
-                        val searchQuery = (conversationState as? ConversationUiState.Success)?.searchQuery ?: ""
+                        val topBarSearchQuery = (conversationState as? ConversationUiState.Success)?.searchQuery ?: ""
                         TextField(
-                            value = searchQuery,
+                            value = topBarSearchQuery,
                             onValueChange = { conversationsViewModel.onSearchQueryChanged(it) },
                             placeholder = { Text("Buscar conversas...", color = Color.White.copy(alpha = 0.7f)) },
                             modifier = Modifier.fillMaxWidth(),
@@ -180,6 +180,13 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { openCamera() }) {
+                        Icon(
+                            Icons.Default.CameraAlt,
+                            contentDescription = "Câmera",
+                            tint = Color(0xFF9E9E9E)
+                        )
+                    }
                     IconButton(onClick = { authViewModel.logout() }) {
                         Icon(
                             Icons.Default.ExitToApp,
@@ -208,10 +215,8 @@ fun HomeScreen(
                 val navItems = listOf(
                     Triple("Home", Icons.Default.Home, 0),
                     Triple("Chamadas", Icons.Default.Phone, 1),
-                    Triple("Câmera", Icons.Default.CameraAlt, 2),
-                    Triple("Status", Icons.Default.WbSunny, 3),
-                    Triple("Contatos", Icons.Default.People, 4),
-                    Triple("Perfil", Icons.Default.Person, 5)
+                    Triple("Status", Icons.Default.WbSunny, 2),
+                    Triple("Perfil", Icons.Default.Person, 3)
                 )
                 navItems.forEach { (label, icon, index) ->
                     NavigationBarItem(
@@ -220,10 +225,8 @@ fun HomeScreen(
                             selectedNavIndex = index
                             when (index) {
                                 1 -> navController.navigate("calls")
-                                2 -> openCamera()
-                                3 -> navController.navigate("status")
-                                4 -> navController.navigate("contacts")
-                                5 -> navController.navigate("profile")
+                                2 -> navController.navigate("status")
+                                3 -> navController.navigate("profile")
                                 else -> {}
                             }
                         },
