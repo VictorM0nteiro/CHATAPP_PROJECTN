@@ -7,6 +7,9 @@ import com.example.app_mensagem.MyApplication
 import com.example.app_mensagem.data.ChatRepository
 import com.example.app_mensagem.data.model.Conversation
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -39,6 +42,7 @@ class ConversationsViewModel(application: Application) : AndroidViewModel(applic
     private var searchQuery: String = ""
     private var selectedTab: ConversationTab = ConversationTab.ALL
     private var presenceMap: Map<String, String> = emptyMap()
+    private var presenceJob: Job? = null
 
     init {
         val db = (application as MyApplication).database
@@ -55,8 +59,11 @@ class ConversationsViewModel(application: Application) : AndroidViewModel(applic
                 repository.syncUserConversations()
                 repository.getConversations().collectLatest { conversations ->
                     allConversations = conversations
-                    fetchPresenceStatuses(conversations)
                     publishState()
+
+                    if (presenceMap.isEmpty()) {
+                        loadPresenceStatuses(conversations)
+                    }
                 }
             } catch (e: Exception) {
                 _uiState.value = ConversationUiState.Error(
@@ -66,22 +73,31 @@ class ConversationsViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    private fun fetchPresenceStatuses(conversations: List<Conversation>) {
+    private fun loadPresenceStatuses(conversations: List<Conversation>) {
+        presenceJob?.cancel()
         val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        viewModelScope.launch {
-            val map = mutableMapOf<String, String>()
-            conversations.filter { !it.isGroup }.forEach { conv ->
-                val otherUid = conv.id.replace(currentUid, "").replace("-", "")
-                if (otherUid.isNotBlank()) {
-                    try {
-                        map[conv.id] = repository.getUserPresenceStatus(otherUid)
-                    } catch (_: Exception) {
-                        map[conv.id] = "offline"
+        val nonGroupConversations = conversations.filter { !it.isGroup }
+        if (nonGroupConversations.isEmpty()) return
+
+        presenceJob = viewModelScope.launch {
+            try {
+                val results = nonGroupConversations.map { conv ->
+                    async {
+                        val otherUid = conv.id.replace(currentUid, "").replace("-", "")
+                        if (otherUid.isNotBlank()) {
+                            val status = try {
+                                repository.getUserPresenceStatus(otherUid)
+                            } catch (_: Exception) {
+                                "offline"
+                            }
+                            conv.id to status
+                        } else null
                     }
-                }
-            }
-            presenceMap = map
-            publishState()
+                }.awaitAll().filterNotNull()
+
+                presenceMap = results.toMap()
+                publishState()
+            } catch (_: Exception) { }
         }
     }
 
@@ -104,8 +120,8 @@ class ConversationsViewModel(application: Application) : AndroidViewModel(applic
     fun resyncConversations() {
         viewModelScope.launch {
             repository.syncUserConversations()
-            fetchPresenceStatuses(allConversations)
         }
+        loadPresenceStatuses(allConversations)
     }
 
     private fun publishState() {
