@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,7 +51,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -84,9 +82,6 @@ fun SignUpScreen(navController: NavController, viewModel: AuthViewModel) {
     val authState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
-    val tinderGradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFFFF7854), Color(0xFFFD267A))
-    )
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -106,275 +101,238 @@ fun SignUpScreen(navController: NavController, viewModel: AuthViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
+            .background(Color.White)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── Header azul ──────────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(210.dp)
-                    .background(brush = tinderGradient),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Criar Conta",
-                        color = Color.White,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Preencha os dados para se cadastrar",
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 13.sp
-                    )
+            Spacer(modifier = Modifier.height(48.dp))
 
-                    Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Crie sua conta",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = primary
+            )
+            Text(
+                text = "Preencha os dados para se cadastrar",
+                fontSize = 14.sp,
+                color = Color(0xFF9E9E9E),
+                modifier = Modifier.padding(top = 4.dp)
+            )
 
-                    // Avatar com botão de câmera
-                    Box(contentAlignment = Alignment.BottomEnd) {
-                        AsyncImage(
-                            model = imageUri ?: R.drawable.ic_launcher_foreground,
-                            contentDescription = "Foto de Perfil",
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(CircleShape)
-                                .border(3.dp, Color.White, CircleShape)
-                                .clickable { imagePickerLauncher.launch("image/*") },
-                            contentScale = ContentScale.Crop
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(26.dp)
-                                .clip(CircleShape)
-                                .background(Color.White),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.CameraAlt,
-                                contentDescription = "Escolher foto",
-                                tint = primary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // ── Card branco com formulário ────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .offset(y = (-20).dp)
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    .background(Color.White)
-            ) {
-                Column(
+            Box(contentAlignment = Alignment.BottomEnd) {
+                AsyncImage(
+                    model = imageUri ?: R.drawable.ic_launcher_foreground,
+                    contentDescription = "Foto de Perfil",
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 28.dp, vertical = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .size(90.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, primary, CircleShape)
+                        .clickable { imagePickerLauncher.launch("image/*") },
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(primary),
+                    contentAlignment = Alignment.Center
                 ) {
-
-                    // Nome
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Nome Completo *") },
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = primary) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primary,
-                            unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = primary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                    Icon(
+                        Icons.Default.CameraAlt,
+                        contentDescription = "Escolher foto",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
                     )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // E-mail
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("E-mail *") },
-                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = primary) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primary,
-                            unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = primary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Telefone
-                    OutlinedTextField(
-                        value = phoneNumber,
-                        onValueChange = { phoneNumber = it },
-                        label = { Text("Número de Telefone") },
-                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = primary) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primary,
-                            unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = primary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Status
-                    OutlinedTextField(
-                        value = statusPhrase,
-                        onValueChange = { statusPhrase = it },
-                        label = { Text("Frase de Status") },
-                        leadingIcon = { Icon(Icons.Default.StarBorder, contentDescription = null, tint = primary) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primary,
-                            unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = primary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Senha
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Senha *") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = primary) },
-                        singleLine = true,
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = null,
-                                    tint = Color.Gray
-                                )
-                            }
-                        },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primary,
-                            unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = primary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Confirmar Senha
-                    OutlinedTextField(
-                        value = confirmPassword,
-                        onValueChange = { confirmPassword = it },
-                        label = { Text("Confirmar Senha *") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = primary) },
-                        singleLine = true,
-                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                                Icon(
-                                    if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = null,
-                                    tint = Color.Gray
-                                )
-                            }
-                        },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primary,
-                            unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = primary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Botão cadastrar
-                    Button(
-                        onClick = {
-                            when {
-                                name.isBlank() || email.isBlank() || password.isBlank() ->
-                                    Toast.makeText(context, "Preencha os campos obrigatórios (*).", Toast.LENGTH_SHORT).show()
-                                password != confirmPassword ->
-                                    Toast.makeText(context, "As senhas não coincidem.", Toast.LENGTH_SHORT).show()
-                                else ->
-                                    viewModel.signUp(email, password, name, statusPhrase, imageUri, phoneNumber)
-                            }
-                        },
-                        enabled = authState != AuthUiState.Loading,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = primary)
-                    ) {
-                        if (authState is AuthUiState.Loading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
-                        } else {
-                            Text("CADASTRAR", fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 1.sp)
-                        }
-                    }
-
-                    // Erro
-                    if (authState is AuthUiState.Error) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = (authState as AuthUiState.Error).message,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    HorizontalDivider(color = Color(0xFFE0E0E0))
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Já tem uma conta?", color = Color.Gray, fontSize = 14.sp)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Faça o login",
-                            color = primary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            modifier = Modifier.clickable {
-                                navController.navigate("login") {
-                                    popUpTo("signup") { inclusive = true }
-                                }
-                                viewModel.resetState()
-                            }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nome Completo *") },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primary,
+                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("E-mail *") },
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primary,
+                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = phoneNumber,
+                onValueChange = { phoneNumber = it },
+                label = { Text("Número de Telefone") },
+                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primary,
+                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = statusPhrase,
+                onValueChange = { statusPhrase = it },
+                label = { Text("Frase de Status") },
+                leadingIcon = { Icon(Icons.Default.StarBorder, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primary,
+                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Senha *") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                singleLine = true,
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = null
+                        )
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primary,
+                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
+                label = { Text("Confirmar Senha *") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                singleLine = true,
+                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        Icon(
+                            if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = null
+                        )
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primary,
+                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    when {
+                        name.isBlank() || email.isBlank() || password.isBlank() ->
+                            Toast.makeText(context, "Preencha os campos obrigatórios (*).", Toast.LENGTH_SHORT).show()
+                        password != confirmPassword ->
+                            Toast.makeText(context, "As senhas não coincidem.", Toast.LENGTH_SHORT).show()
+                        else ->
+                            viewModel.signUp(email, password, name, statusPhrase, imageUri, phoneNumber)
+                    }
+                },
+                enabled = authState != AuthUiState.Loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = primary)
+            ) {
+                if (authState is AuthUiState.Loading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Cadastrar", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            if (authState is AuthUiState.Error) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = (authState as AuthUiState.Error).message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            HorizontalDivider(color = Color(0xFFE0E0E0))
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Já tem uma conta? ", color = Color(0xFF9E9E9E), fontSize = 14.sp)
+                Text(
+                    text = "Faça o login",
+                    color = primary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.clickable {
+                        navController.navigate("login") {
+                            popUpTo("signup") { inclusive = true }
+                        }
+                        viewModel.resetState()
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
