@@ -84,7 +84,6 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.app_mensagem.R
 import com.example.app_mensagem.data.model.Conversation
-import com.example.app_mensagem.data.model.PresenceStatus
 import com.example.app_mensagem.presentation.common.LifecycleObserver
 import com.example.app_mensagem.presentation.viewmodel.AuthViewModel
 import com.example.app_mensagem.presentation.viewmodel.ConversationTab
@@ -305,7 +304,6 @@ fun HomeScreen(
                             items(state.conversations) { conversation ->
                                 ConversationItem(
                                     conversation = conversation,
-                                    presenceStatus = state.presenceStatuses[conversation.id],
                                     onClick = { navController.navigate("chat/${conversation.id}") },
                                     onFavoriteClick = {
                                         if (!conversation.isGroup) conversationsViewModel.toggleFavorite(conversation.id)
@@ -418,7 +416,6 @@ fun StoriesRow(
 @Composable
 fun ConversationItem(
     conversation: Conversation,
-    presenceStatus: String? = null,
     onClick: () -> Unit,
     onFavoriteClick: () -> Unit
 ) {
@@ -450,21 +447,6 @@ fun ConversationItem(
                 ) {
                     Icon(Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
                 }
-            } else if (presenceStatus != null) {
-                val presence = PresenceStatus.fromKey(presenceStatus)
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .clip(CircleShape)
-                        .background(
-                            when (presence) {
-                                PresenceStatus.ONLINE -> Color(0xFF4CAF50)
-                                PresenceStatus.BUSY -> Color(0xFFFFC107)
-                                PresenceStatus.OFFLINE -> Color.Gray
-                            }
-                        )
-                        .align(Alignment.BottomEnd)
-                )
             }
         }
 
