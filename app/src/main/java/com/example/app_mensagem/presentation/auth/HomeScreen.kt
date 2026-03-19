@@ -148,6 +148,7 @@ fun HomeScreen(
                             onValueChange = { conversationsViewModel.onSearchQueryChanged(it) },
                             placeholder = { Text("Buscar conversas...", color = Color.White.copy(alpha = 0.7f)) },
                             modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,

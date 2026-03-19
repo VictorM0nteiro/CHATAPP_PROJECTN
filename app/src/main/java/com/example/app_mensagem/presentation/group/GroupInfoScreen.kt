@@ -214,7 +214,12 @@ fun GroupInfoScreen(
                                     contentDescription = "Foto de perfil do grupo",
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .clip(CircleShape),
+                                        .clip(CircleShape)
+                                        .then(
+                                            if (uiState.group?.creatorId == currentUserId)
+                                                Modifier.clickable { showImageSourceDialog = true }
+                                            else Modifier
+                                        ),
                                     contentScale = ContentScale.Crop
                                 )
                                 if (uiState.group?.creatorId == currentUserId) {

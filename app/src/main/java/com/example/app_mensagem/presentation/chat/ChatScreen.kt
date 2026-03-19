@@ -910,7 +910,25 @@ private fun MessageBubble(
                         }
 
                         "AUDIO" -> {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            val audioContext = LocalContext.current
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(message.content)
+                                    ).apply { addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                                    try {
+                                        audioContext.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = "Reproduzir áudio",
+                                    tint = contentColor
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
                                     Icons.Default.GraphicEq,
                                     contentDescription = null,
@@ -925,7 +943,21 @@ private fun MessageBubble(
                         }
 
                         "DOCUMENT" -> {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            val docContext = LocalContext.current
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(message.content)
+                                    )
+                                    try {
+                                        docContext.startActivity(
+                                            android.content.Intent.createChooser(intent, "Abrir com...")
+                                        )
+                                    } catch (_: Exception) {}
+                                }
+                            ) {
                                 Icon(
                                     Icons.Default.Description,
                                     contentDescription = null,
@@ -934,7 +966,10 @@ private fun MessageBubble(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = message.fileName ?: "Documento",
-                                    color = contentColor
+                                    color = contentColor,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                                    )
                                 )
                             }
                         }
@@ -950,15 +985,20 @@ private fun MessageBubble(
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                                 modifier = Modifier
                                     .clickable {
-                                        val geoUri = if (coords.isNotEmpty())
-                                            "geo:$coords?q=$coords"
-                                        else
+                                        val mapsUrl = if (message.content.startsWith("http")) {
                                             message.content
-                                        val intent = android.content.Intent(
+                                        } else if (coords.isNotEmpty()) {
+                                            "https://www.google.com/maps/search/?api=1&query=$coords"
+                                        } else {
+                                            message.content
+                                        }
+                                        val browserIntent = android.content.Intent(
                                             android.content.Intent.ACTION_VIEW,
-                                            android.net.Uri.parse(geoUri)
+                                            android.net.Uri.parse(mapsUrl)
                                         )
-                                        locationContext.startActivity(intent)
+                                        try {
+                                            locationContext.startActivity(browserIntent)
+                                        } catch (_: Exception) {}
                                     }
                             ) {
                                 Row(
