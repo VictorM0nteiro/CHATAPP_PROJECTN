@@ -1293,7 +1293,9 @@ private fun MessageBubble(
                         "STICKER" -> {
                             Text(
                                 text = message.content,
-                                fontSize = 28.sp
+                                fontSize = 72.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
 
