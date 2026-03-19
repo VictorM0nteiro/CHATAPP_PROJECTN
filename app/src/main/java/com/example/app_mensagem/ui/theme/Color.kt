@@ -11,11 +11,10 @@ data class AppThemePalette(
 )
 
 object AppThemePalettes {
-    // Paleta principal — estilo Tinder (gradiente laranja → rosa)
     val Blue = AppThemePalette(
-        primary = Color(0xFFFF4458),
-        primaryContainer = Color(0xFFFFE0E4),
-        secondary = Color(0xFFFD267A),
+        primary = Color(0xFF2196F3),
+        primaryContainer = Color(0xFFE3F2FD),
+        secondary = Color(0xFF1E88E5),
         background = Color(0xFFF5F5F5),
         surface = Color(0xFFFFFFFF)
     )
