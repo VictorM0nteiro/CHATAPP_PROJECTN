@@ -760,4 +760,10 @@ class ChatRepository(
 
         return contacts
     }
+
+    suspend fun getUserPresenceStatus(userId: String): String {
+        val snapshot = database.getReference("users").child(userId)
+            .child("presenceStatus").get().await()
+        return snapshot.getValue(String::class.java) ?: "offline"
+    }
 }
