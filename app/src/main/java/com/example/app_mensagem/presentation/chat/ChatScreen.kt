@@ -3,6 +3,8 @@ package com.example.app_mensagem.presentation.chat
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.MediaPlayer
+import android.net.Uri as AndroidUri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
@@ -59,6 +62,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -72,9 +76,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -106,6 +112,7 @@ import com.example.app_mensagem.data.model.User
 import com.example.app_mensagem.presentation.common.LifecycleObserver
 import com.example.app_mensagem.presentation.viewmodel.ChatViewModel
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -122,9 +129,58 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
     var selectedMessageId by remember { mutableStateOf<String?>(null) }
     var isSearchActive by remember { mutableStateOf(false) }
     var showMediaSheet by remember { mutableStateOf(false) }
+    var playingAudioId by remember { mutableStateOf<String?>(null) }
+    var audioProgress by remember { mutableFloatStateOf(0f) }
+    val mediaPlayer = remember { MediaPlayer() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val primaryColor = MaterialTheme.colorScheme.primary
+
+    DisposableEffect(Unit) {
+        onDispose {
+            mediaPlayer.release()
+        }
+    }
+
+    fun playAudio(messageId: String, url: String) {
+        if (playingAudioId == messageId) {
+            mediaPlayer.stop()
+            mediaPlayer.reset()
+            playingAudioId = null
+            audioProgress = 0f
+            return
+        }
+
+        mediaPlayer.reset()
+        playingAudioId = messageId
+        audioProgress = 0f
+
+        try {
+            mediaPlayer.setDataSource(url)
+            mediaPlayer.prepareAsync()
+            mediaPlayer.setOnPreparedListener { mp ->
+                mp.start()
+                scope.launch {
+                    while (playingAudioId == messageId && mp.isPlaying) {
+                        audioProgress = mp.currentPosition.toFloat() / mp.duration.coerceAtLeast(1).toFloat()
+                        delay(200)
+                    }
+                }
+            }
+            mediaPlayer.setOnCompletionListener {
+                playingAudioId = null
+                audioProgress = 0f
+            }
+            mediaPlayer.setOnErrorListener { _, _, _ ->
+                playingAudioId = null
+                audioProgress = 0f
+                true
+            }
+        } catch (e: Exception) {
+            playingAudioId = null
+            audioProgress = 0f
+        }
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -511,6 +567,45 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                         isMine = isMine,
                                         highlightQuery = uiState.searchQuery,
                                         groupMembers = uiState.groupMembers,
+                                        isAudioPlaying = playingAudioId == message.id,
+                                        audioProgress = if (playingAudioId == message.id) audioProgress else 0f,
+                                        onPlayAudio = { playAudio(message.id, message.content) },
+                                        onPlayVideo = {
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(AndroidUri.parse(message.content), "video/*")
+                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (_: Exception) {
+                                                val browserIntent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(message.content))
+                                                context.startActivity(browserIntent)
+                                            }
+                                        },
+                                        onOpenDocument = {
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                    data = AndroidUri.parse(message.content)
+                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (_: Exception) {
+                                                val browserIntent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(message.content))
+                                                context.startActivity(browserIntent)
+                                            }
+                                        },
+                                        onImageClick = { url ->
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(AndroidUri.parse(url), "image/*")
+                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (_: Exception) {
+                                                val browserIntent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(url))
+                                                context.startActivity(browserIntent)
+                                            }
+                                        },
                                         onLongPress = {
                                             selectedMessageId = message.id
                                         }
@@ -936,6 +1031,12 @@ private fun MessageBubble(
     isMine: Boolean,
     highlightQuery: String,
     groupMembers: Map<String, User>,
+    isAudioPlaying: Boolean = false,
+    audioProgress: Float = 0f,
+    onPlayAudio: () -> Unit = {},
+    onPlayVideo: () -> Unit = {},
+    onOpenDocument: () -> Unit = {},
+    onImageClick: (String) -> Unit = {},
     onLongPress: () -> Unit
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -993,56 +1094,97 @@ private fun MessageBubble(
                                 contentDescription = "Imagem",
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp)),
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onImageClick(message.content) },
                                 contentScale = ContentScale.Crop
                             )
                         }
 
                         "VIDEO" -> {
-                            Column {
-                                message.thumbnailUrl?.let { thumb ->
-                                    AsyncImage(
-                                        model = thumb,
-                                        contentDescription = "Miniatura do vídeo",
+                            Column(
+                                modifier = Modifier.clickable { onPlayVideo() }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    message.thumbnailUrl?.let { thumb ->
+                                        AsyncImage(
+                                            model = thumb,
+                                            contentDescription = "Miniatura do vídeo",
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(12.dp)),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } ?: Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp)),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                            .height(120.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(contentColor.copy(alpha = 0.1f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {}
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.Black.copy(alpha = 0.5f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.PlayArrow,
+                                            contentDescription = "Reproduzir vídeo",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(30.dp)
+                                        )
+                                    }
                                 }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        tint = contentColor
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = message.fileName ?: "Vídeo",
-                                        color = contentColor
-                                    )
-                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = message.fileName ?: "Vídeo",
+                                    fontSize = 12.sp,
+                                    color = contentColor.copy(alpha = 0.8f)
+                                )
                             }
                         }
 
                         "AUDIO" -> {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clickable { onPlayAudio() }
+                                    .padding(vertical = 2.dp)
+                            ) {
                                 Icon(
-                                    Icons.Default.GraphicEq,
-                                    contentDescription = null,
-                                    tint = contentColor
+                                    imageVector = if (isAudioPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (isAudioPlaying) "Pausar" else "Reproduzir",
+                                    tint = contentColor,
+                                    modifier = Modifier.size(28.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Mensagem de voz",
-                                    color = contentColor
-                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    LinearProgressIndicator(
+                                        progress = { audioProgress },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(3.dp)
+                                            .clip(RoundedCornerShape(2.dp)),
+                                        color = contentColor,
+                                        trackColor = contentColor.copy(alpha = 0.3f)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Mensagem de voz",
+                                        fontSize = 12.sp,
+                                        color = contentColor.copy(alpha = 0.8f)
+                                    )
+                                }
                             }
                         }
 
                         "DOCUMENT" -> {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { onOpenDocument() }
+                            ) {
                                 Icon(
                                     Icons.Default.Description,
                                     contentDescription = null,
