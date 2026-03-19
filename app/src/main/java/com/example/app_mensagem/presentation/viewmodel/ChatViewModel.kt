@@ -168,24 +168,25 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     null
                 }
 
-                var presenceStatus = _uiState.value.otherUserPresenceStatus
-                if (!conversation.isGroup) {
-                    val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-                    val otherUid = conversationId.replace(currentUid, "").replace("-", "")
-                    if (otherUid.isNotBlank()) {
-                        presenceStatus = try {
-                            repository.getUserPresenceStatus(otherUid)
-                        } catch (_: Exception) { "offline" }
-                    }
-                }
-
                 _uiState.value = _uiState.value.copy(
                     conversationTitle = conversation.name,
                     conversation = conversation,
                     groupMembers = membersMap,
-                    pinnedMessage = pinnedMessage,
-                    otherUserPresenceStatus = presenceStatus
+                    pinnedMessage = pinnedMessage
                 )
+
+                if (!conversation.isGroup && _uiState.value.otherUserPresenceStatus == "offline") {
+                    val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                    val otherUid = conversationId.replace(currentUid, "").replace("-", "")
+                    if (otherUid.isNotBlank()) {
+                        val status = try {
+                            repository.getUserPresenceStatus(otherUid)
+                        } catch (_: Exception) { "offline" }
+                        _uiState.value = _uiState.value.copy(
+                            otherUserPresenceStatus = status
+                        )
+                    }
+                }
             }
         }
 
