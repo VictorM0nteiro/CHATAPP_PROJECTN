@@ -30,6 +30,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -39,6 +42,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Done
@@ -130,6 +134,7 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
     var selectedMessageId by remember { mutableStateOf<String?>(null) }
     var isSearchActive by remember { mutableStateOf(false) }
     var showMediaSheet by remember { mutableStateOf(false) }
+    var showStickerPanel by remember { mutableStateOf(false) }
     var playingAudioId by remember { mutableStateOf<String?>(null) }
     var audioProgress by remember { mutableFloatStateOf(0f) }
     val mediaPlayer = remember { MediaPlayer() }
@@ -425,6 +430,16 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                         onCancel = { chatViewModel.cancelRecording() }
                     )
                 } else {
+                    AnimatedVisibility(visible = showStickerPanel) {
+                        StickerPanel(
+                            onStickerSelected = { emoji ->
+                                if (conversationId != null) {
+                                    chatViewModel.sendSticker(conversationId, emoji)
+                                }
+                                showStickerPanel = false
+                            }
+                        )
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -438,6 +453,14 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                 Icons.Default.Add,
                                 contentDescription = "Anexar",
                                 tint = primaryColor
+                            )
+                        }
+
+                        IconButton(onClick = { showStickerPanel = !showStickerPanel }) {
+                            Icon(
+                                Icons.Default.EmojiEmotions,
+                                contentDescription = "Stickers",
+                                tint = if (showStickerPanel) primaryColor else Color.Gray
                             )
                         }
 
@@ -1456,6 +1479,51 @@ private fun MessageActionsBar(
 
                 TextButton(onClick = onDismiss) {
                     Text("Fechar")
+                }
+            }
+        }
+    }
+}
+
+private val stickerList = listOf(
+    "\uD83D\uDE00", "\uD83D\uDE02", "\uD83D\uDE0D", "\uD83E\uDD29", "\uD83E\uDD23",
+    "\uD83D\uDE0E", "\uD83D\uDE1C", "\uD83E\uDD17", "\uD83D\uDE4F", "\uD83D\uDC4D",
+    "\uD83D\uDC4B", "\uD83C\uDF89", "\uD83D\uDD25", "\u2764\uFE0F", "\uD83D\uDC94",
+    "\uD83D\uDCAF", "\uD83C\uDF1F", "\uD83D\uDE80", "\uD83C\uDF08", "\uD83C\uDF82",
+    "\uD83C\uDF83", "\uD83D\uDC7B", "\uD83E\uDD21", "\uD83D\uDC36", "\uD83D\uDC31"
+)
+
+@Composable
+private fun StickerPanel(
+    onStickerSelected: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .padding(12.dp)
+    ) {
+        Text(
+            text = "Stickers",
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(5),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.height(220.dp)
+        ) {
+            gridItems(stickerList) { sticker ->
+                Box(
+                    modifier = Modifier
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onStickerSelected(sticker) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = sticker, fontSize = 32.sp)
                 }
             }
         }
