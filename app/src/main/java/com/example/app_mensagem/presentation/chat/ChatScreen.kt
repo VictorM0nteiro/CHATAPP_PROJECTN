@@ -133,6 +133,80 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    // ── Player de áudio centralizado (um único MediaPlayer para toda a tela) ──
+    var currentAudioUrl by remember { mutableStateOf<String?>(null) }
+    var isAudioPlaying by remember { mutableStateOf(false) }
+    var isAudioLoading by remember { mutableStateOf(false) }
+    var audioDuration by remember { mutableIntStateOf(0) }
+    var audioProgress by remember { mutableFloatStateOf(0f) }
+
+    val audioPlayer = remember {
+        MediaPlayer().apply {
+            setOnCompletionListener {
+                isAudioPlaying = false
+                audioProgress = 0f
+                it.seekTo(0)
+            }
+            setOnErrorListener { mp, _, _ ->
+                isAudioPlaying = false
+                isAudioLoading = false
+                mp.reset()
+                true
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (audioPlayer.isPlaying) audioPlayer.stop()
+            audioPlayer.release()
+        }
+    }
+
+    LaunchedEffect(isAudioPlaying) {
+        while (isAudioPlaying) {
+            if (audioPlayer.isPlaying) {
+                val dur = audioDuration.takeIf { it > 0 } ?: 1
+                audioProgress = audioPlayer.currentPosition.toFloat() / dur
+            }
+            delay(200)
+        }
+    }
+
+    fun playAudio(url: String) {
+        if (url.isBlank()) return
+        if (currentAudioUrl == url) {
+            // Mesmo áudio: play/pause
+            if (isAudioPlaying) {
+                audioPlayer.pause()
+                isAudioPlaying = false
+            } else {
+                audioPlayer.start()
+                isAudioPlaying = true
+            }
+        } else {
+            // Novo áudio: reset e carrega
+            isAudioLoading = true
+            isAudioPlaying = false
+            audioProgress = 0f
+            currentAudioUrl = url
+            try {
+                audioPlayer.reset()
+                audioPlayer.setDataSource(url)
+                audioPlayer.setOnPreparedListener { mp ->
+                    isAudioLoading = false
+                    audioDuration = mp.duration
+                    mp.start()
+                    isAudioPlaying = true
+                }
+                audioPlayer.prepareAsync()
+            } catch (_: Exception) {
+                isAudioLoading = false
+                currentAudioUrl = null
+            }
+        }
+    }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri ->
@@ -550,7 +624,12 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                         onLongPress = { y ->
                                             selectedMessageId = message.id
                                             selectedMessageY = y
-                                        }
+                                        },
+                                        currentAudioUrl = currentAudioUrl,
+                                        isAudioPlaying = isAudioPlaying,
+                                        isAudioLoading = isAudioLoading,
+                                        audioProgress = audioProgress,
+                                        onPlayAudio = { url -> playAudio(url) }
                                     )
                                 }
                             }
@@ -822,7 +901,12 @@ private fun MessageBubble(
     isMine: Boolean,
     highlightQuery: String,
     groupMembers: Map<String, User>,
-    onLongPress: (Float) -> Unit
+    onLongPress: (Float) -> Unit,
+    currentAudioUrl: String? = null,
+    isAudioPlaying: Boolean = false,
+    isAudioLoading: Boolean = false,
+    audioProgress: Float = 0f,
+    onPlayAudio: (String) -> Unit = {}
 ) {
     val backgroundColor =
         if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
@@ -918,10 +1002,29 @@ private fun MessageBubble(
                         }
 
                         "AUDIO" -> {
-                            AudioMessagePlayer(
-                                url = message.content,
-                                contentColor = contentColor
-                            )
+                            val isThisLoading = isAudioLoading && currentAudioUrl == message.content
+                            val isThisPlaying = isAudioPlaying && currentAudioUrl == message.content
+                            val thisProgress = if (currentAudioUrl == message.content) audioProgress else 0f
+
+                            if (message.content.isBlank()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = contentColor
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Preparando...", color = contentColor, fontSize = 13.sp)
+                                }
+                            } else {
+                                AudioBubble(
+                                    isPlaying = isThisPlaying,
+                                    isLoading = isThisLoading,
+                                    progress = thisProgress,
+                                    contentColor = contentColor,
+                                    onClick = { onPlayAudio(message.content) }
+                                )
+                            }
                         }
 
                         "DOCUMENT" -> {
@@ -1215,84 +1318,16 @@ private fun MessageActionsBar(
 }
 
 @Composable
-private fun AudioMessagePlayer(url: String, contentColor: Color) {
-    var isPlaying by remember { mutableStateOf(false) }
-    var isPrepared by remember { mutableStateOf(false) }
-    var progress by remember { mutableFloatStateOf(0f) }
-    var duration by remember { mutableIntStateOf(0) }
-    var isLoading by remember { mutableStateOf(false) }
-
-    val mediaPlayer = remember {
-        MediaPlayer().apply {
-            setOnPreparedListener {
-                isPrepared = true
-                isLoading = false
-                duration = it.duration
-            }
-            setOnCompletionListener {
-                isPlaying = false
-                progress = 0f
-                seekTo(0)
-            }
-            setOnErrorListener { _, _, _ ->
-                isLoading = false
-                isPlaying = false
-                true
-            }
-        }
-    }
-
-    DisposableEffect(url) {
-        onDispose {
-            mediaPlayer.stop()
-            mediaPlayer.release()
-        }
-    }
-
-    // Poll progress while playing
-    LaunchedEffect(isPlaying) {
-        while (isPlaying) {
-            if (isPrepared && mediaPlayer.isPlaying) {
-                val dur = mediaPlayer.duration.takeIf { it > 0 } ?: 1
-                progress = mediaPlayer.currentPosition.toFloat() / dur
-            }
-            delay(200)
-        }
-    }
-
-    fun togglePlay() {
-        if (!isPrepared) {
-            isLoading = true
-            try {
-                mediaPlayer.setDataSource(url)
-                mediaPlayer.prepareAsync()
-                mediaPlayer.setOnPreparedListener { mp ->
-                    isPrepared = true
-                    isLoading = false
-                    duration = mp.duration
-                    mp.start()
-                    isPlaying = true
-                }
-            } catch (_: Exception) {
-                isLoading = false
-            }
-        } else {
-            if (isPlaying) {
-                mediaPlayer.pause()
-                isPlaying = false
-            } else {
-                mediaPlayer.start()
-                isPlaying = true
-            }
-        }
-    }
-
+private fun AudioBubble(
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    progress: Float,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
     Column(modifier = Modifier.width(200.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(
-                onClick = { togglePlay() },
-                modifier = Modifier.size(36.dp)
-            ) {
+            IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
                 if (isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
@@ -1311,12 +1346,7 @@ private fun AudioMessagePlayer(url: String, contentColor: Color) {
             Spacer(modifier = Modifier.width(4.dp))
             Slider(
                 value = progress,
-                onValueChange = { newVal ->
-                    if (isPrepared) {
-                        progress = newVal
-                        mediaPlayer.seekTo((newVal * mediaPlayer.duration).toInt())
-                    }
-                },
+                onValueChange = {},
                 modifier = Modifier.weight(1f).height(24.dp),
                 colors = SliderDefaults.colors(
                     thumbColor = contentColor,
@@ -1324,14 +1354,6 @@ private fun AudioMessagePlayer(url: String, contentColor: Color) {
                     inactiveTrackColor = contentColor.copy(alpha = 0.3f)
                 )
             )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 36.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            val elapsed = if (isPrepared && duration > 0) (progress * duration).toInt() else 0
-            Text(formatAudioTime(elapsed), fontSize = 10.sp, color = contentColor.copy(alpha = 0.7f))
-            Text(formatAudioTime(duration), fontSize = 10.sp, color = contentColor.copy(alpha = 0.7f))
         }
     }
 }

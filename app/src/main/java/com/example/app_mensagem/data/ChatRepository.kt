@@ -465,7 +465,9 @@ class ChatRepository(
             id = messageId,
             conversationId = conversationId,
             senderId = currentUserId,
-            content = "",
+            // Para áudio, usa o URI local para permitir reprodução imediata enquanto faz upload.
+            // Para outros tipos, fica vazio até o upload terminar.
+            content = if (normalizedType == "AUDIO") uri.toString() else "",
             type = normalizedType,
             thumbnailUrl = null,
             timestamp = timestamp,
