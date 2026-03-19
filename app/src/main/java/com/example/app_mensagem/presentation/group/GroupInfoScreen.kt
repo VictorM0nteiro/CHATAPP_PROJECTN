@@ -1,9 +1,17 @@
 package com.example.app_mensagem.presentation.group
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import java.io.File
+import java.io.FileOutputStream
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,7 +73,9 @@ fun GroupInfoScreen(
     val uiState by groupInfoViewModel.uiState.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
     var userToRemove by remember { mutableStateOf<User?>(null) }
+    var showImageSourceDialog by remember { mutableStateOf(false) }
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    val context = LocalContext.current
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -73,6 +83,46 @@ fun GroupInfoScreen(
         if (uri != null && groupId != null) {
             groupInfoViewModel.updateGroupProfilePicture(groupId, uri)
         }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null && groupId != null) {
+            val file = File(context.cacheDir, "group_photo_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            groupInfoViewModel.updateGroupProfilePicture(groupId, Uri.fromFile(file))
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) cameraLauncher.launch(null)
+    }
+
+    if (showImageSourceDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = { Text("Alterar foto do grupo") },
+            text = { Text("Como deseja escolher a foto?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    val hasCameraPermission = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (hasCameraPermission) cameraLauncher.launch(null)
+                    else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }) { Text("Câmera") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    imagePicker.launch("image/*")
+                }) { Text("Galeria") }
+            }
+        )
     }
 
     val selectedUserHandle = navController.currentBackStackEntry?.savedStateHandle
@@ -156,27 +206,38 @@ fun GroupInfoScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Box(
-                                modifier = Modifier
-                                    .size(120.dp)
-                                    .clip(CircleShape)
-                                    .clickable(enabled = uiState.group?.creatorId == currentUserId) {
-                                        imagePicker.launch("image/*")
-                                    },
-                                contentAlignment = Alignment.Center
+                                modifier = Modifier.size(120.dp),
+                                contentAlignment = Alignment.BottomEnd
                             ) {
                                 AsyncImage(
                                     model = uiState.group?.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
                                     contentDescription = "Foto de perfil do grupo",
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape)
+                                        .then(
+                                            if (uiState.group?.creatorId == currentUserId)
+                                                Modifier.clickable { showImageSourceDialog = true }
+                                            else Modifier
+                                        ),
                                     contentScale = ContentScale.Crop
                                 )
                                 if (uiState.group?.creatorId == currentUserId) {
-                                    Icon(
-                                        imageVector = Icons.Default.CameraAlt,
-                                        contentDescription = "Alterar foto",
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(48.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                            .clickable { showImageSourceDialog = true },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CameraAlt,
+                                            contentDescription = "Alterar foto",
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
 

@@ -101,6 +101,8 @@ fun HomeScreen(
     authViewModel: AuthViewModel,
     conversationsViewModel: ConversationsViewModel = viewModel()
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+    var isSearchActive by remember { mutableStateOf(false) }
     var selectedNavIndex by remember { mutableIntStateOf(0) }
     val conversationState by conversationsViewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -136,11 +138,42 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Mensagens",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp
-                    )
+                    if (isSearchActive) {
+                        val searchQuery = (conversationState as? ConversationUiState.Success)?.searchQuery ?: ""
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { conversationsViewModel.onSearchQueryChanged(it) },
+                            placeholder = { Text("Buscar conversas...", color = Color.White.copy(alpha = 0.7f)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = Color.White,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            textStyle = LocalTextStyle.current.copy(color = Color.White)
+                        )
+                    } else {
+                        Text("Home", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    }
+                },
+                navigationIcon = {
+                    if (isSearchActive) {
+                        IconButton(onClick = {
+                            isSearchActive = false
+                            conversationsViewModel.onSearchQueryChanged("")
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Fechar Busca", tint = Color.White)
+                        }
+                    } else {
+                        IconButton(onClick = { isSearchActive = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "Buscar", tint = Color.White)
+                        }
+                    }
                 },
                 actions = {
                     IconButton(onClick = { authViewModel.logout() }) {

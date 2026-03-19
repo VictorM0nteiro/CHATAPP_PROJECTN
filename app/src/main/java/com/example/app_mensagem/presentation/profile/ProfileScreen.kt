@@ -99,11 +99,20 @@ fun ProfileScreen(
     val selectedTheme by themeViewModel.selectedTheme
     val primary = MaterialTheme.colorScheme.primary
 
-    var name by remember(user?.uid) { mutableStateOf(user?.name ?: "") }
-    var phoneNumber by remember(user?.uid) { mutableStateOf(user?.phoneNumber ?: "") }
-    var status by remember(user?.uid) { mutableStateOf(user?.status ?: "") }
-    var updateStatus by remember(user?.uid) { mutableStateOf(user?.updateStatus ?: "") }
+    var name by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf("") }
+    var updateStatus by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
+
+    LaunchedEffect(uiState.user) {
+        uiState.user?.let { u ->
+            name = u.name
+            phoneNumber = u.phoneNumber
+            status = u.status
+            updateStatus = u.updateStatus
+        }
+    }
     var showImageSourceDialog by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
     val currentPresence = PresenceStatus.fromKey(user?.presenceStatus)
@@ -194,7 +203,7 @@ fun ProfileScreen(
                         .fillMaxWidth()
                         .height(130.dp)
                         .background(
-                            Brush.verticalGradient(listOf(Color(0xFFFF7854), Color(0xFFFD267A)))
+                            Brush.verticalGradient(listOf(primary.copy(alpha = 0.6f), primary))
                         )
                 )
 
