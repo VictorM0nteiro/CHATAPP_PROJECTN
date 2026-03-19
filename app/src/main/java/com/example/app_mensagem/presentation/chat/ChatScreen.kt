@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
@@ -78,7 +79,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -114,7 +118,10 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
     var text by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     var selectedMessageId by remember { mutableStateOf<String?>(null) }
+    var selectedMessageY by remember { mutableStateOf(0f) }
+    val containerTopHolder = remember { object { var y = 0f } }
     var isSearchActive by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -451,6 +458,7 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(paddingValues)
+                .onGloballyPositioned { containerTopHolder.y = it.positionInRoot().y }
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
@@ -459,7 +467,14 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                     PinnedMessageBar(
                         message = pinned,
                         currentUserId = FirebaseAuth.getInstance().currentUser?.uid,
-                        onClick = {},
+                        onClick = {
+                            val index = uiState.chatItems.indexOfFirst {
+                                it is ChatItem.MessageItem && it.message.id == pinned.id
+                            }
+                            if (index >= 0) {
+                                scope.launch { listState.animateScrollToItem(index) }
+                            }
+                        },
                         onUnpinClick = {
                             if (conversationId != null) {
                                 chatViewModel.onPinMessageClick(conversationId, pinned)
@@ -524,8 +539,9 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                                         isMine = isMine,
                                         highlightQuery = uiState.searchQuery,
                                         groupMembers = uiState.groupMembers,
-                                        onLongPress = {
+                                        onLongPress = { y ->
                                             selectedMessageId = message.id
+                                            selectedMessageY = y
                                         }
                                     )
                                 }
@@ -534,22 +550,34 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                     }
 
                     LaunchedEffect(uiState.chatItems.size) {
-                        if (uiState.chatItems.isNotEmpty()) {
-                            scope.launch {
-                                listState.animateScrollToItem(uiState.chatItems.lastIndex)
-                            }
+                        val index = uiState.chatItems.lastIndex
+                        if (index >= 0) {
+                            listState.animateScrollToItem(index)
                         }
                     }
                 }
             }
 
             if (selectedMessageId != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.25f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { selectedMessageId = null }
+                        )
+                )
                 val selectedMessage = uiState.messages.find { it.id == selectedMessageId }
                 selectedMessage?.let { msg ->
+                    val relativeYDp = with(density) { (selectedMessageY - containerTopHolder.y).toDp() }
+                    val clampedY = maxOf(8.dp, relativeYDp)
                     MessageActionsBar(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 88.dp),
+                            .align(Alignment.TopStart)
+                            .padding(horizontal = 16.dp)
+                            .offset(y = clampedY),
                         isPinned = uiState.pinnedMessage?.id == msg.id,
                         onDismiss = { selectedMessageId = null },
                         onPinClick = {
@@ -786,12 +814,14 @@ private fun MessageBubble(
     isMine: Boolean,
     highlightQuery: String,
     groupMembers: Map<String, User>,
-    onLongPress: () -> Unit
+    onLongPress: (Float) -> Unit
 ) {
     val backgroundColor =
         if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
     val contentColor =
         if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+
+    val bubbleTopHolder = remember { object { var y = 0f } }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -803,12 +833,14 @@ private fun MessageBubble(
 
         Column(
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
-            modifier = Modifier.combinedClickable(
-                onClick = {},
-                onLongClick = onLongPress,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            )
+            modifier = Modifier
+                .onGloballyPositioned { bubbleTopHolder.y = it.positionInRoot().y }
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = { onLongPress(bubbleTopHolder.y) },
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                )
         ) {
             if (!isMine && groupMembers.isNotEmpty()) {
                 val senderName = groupMembers[message.senderId]?.name
@@ -908,17 +940,61 @@ private fun MessageBubble(
                         }
 
                         "LOCATION" -> {
-                            Text(
-                                text = "📍 Localização",
-                                color = contentColor,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            HighlightingText(
-                                text = message.content,
-                                query = highlightQuery,
-                                color = contentColor
-                            )
+                            val locationContext = LocalContext.current
+                            val coords = message.content.substringAfter("query=", "")
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isMine)
+                                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f)
+                                else
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                modifier = Modifier
+                                    .clickable {
+                                        val geoUri = if (coords.isNotEmpty())
+                                            "geo:$coords?q=$coords"
+                                        else
+                                            message.content
+                                        val intent = android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(geoUri)
+                                        )
+                                        locationContext.startActivity(intent)
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "Localização",
+                                            color = contentColor,
+                                            fontWeight = FontWeight.SemiBold,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        if (coords.isNotEmpty()) {
+                                            Text(
+                                                text = coords,
+                                                color = contentColor.copy(alpha = 0.75f),
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                        Text(
+                                            text = "Toque para abrir no Maps",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         "STICKER" -> {
