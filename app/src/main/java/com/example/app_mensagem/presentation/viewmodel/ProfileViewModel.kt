@@ -66,6 +66,24 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun updatePresenceStatus(presenceStatus: String) {
+        viewModelScope.launch {
+            try {
+                repository.updatePresenceStatus(presenceStatus)
+                val currentUser = _uiState.value.user
+                if (currentUser != null) {
+                    _uiState.value = _uiState.value.copy(
+                        user = currentUser.copy(presenceStatus = presenceStatus)
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Erro ao atualizar status."
+                )
+            }
+        }
+    }
+
     fun clearSavedFlag() {
         _uiState.value = _uiState.value.copy(isSaved = false)
     }
